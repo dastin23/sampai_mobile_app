@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/format/date.dart';
 import '../../core/format/rupiah.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/theme/category_icons.dart';
 import '../budget/widgets/budget_usage_row.dart';
+import '../transactions/widgets/transaction_tile.dart';
 import 'home_data.dart';
 
 class SectionHeader extends StatelessWidget {
@@ -249,54 +249,9 @@ class RecentTransactionsSection extends StatelessWidget {
                   if (i > 0) const Divider(height: 20),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: AppColors.canvas,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            categoryIcon(transactions[i].category),
-                            size: 20,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                transactions[i].title,
-                                style: AppTypography.bodyStrong,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                transactions[i].category,
-                                style: AppTypography.caption,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '−${formatRupiah(transactions[i].amount)}',
-                              style: AppTypography.bodyStrong,
-                            ),
-                            Text(
-                              formatRelativeDay(transactions[i].date, today),
-                              style: AppTypography.caption,
-                            ),
-                          ],
-                        ),
-                      ],
+                    child: TransactionTile(
+                      transaction: transactions[i],
+                      today: today,
                     ),
                   ),
                 ],

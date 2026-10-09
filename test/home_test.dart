@@ -170,7 +170,7 @@ void main() {
     await tester.tap(find.text('Transaksi'));
     await tester.pumpAndSettle();
     expect(find.text('Transaksi'), findsWidgets);
-    expect(find.text('Layar ini menyusul pada iterasi berikutnya.'),
-        findsOneWidget);
+    expect(find.text('Terpakai siklus ini'), findsOneWidget);
+    expect(find.text('Warung makan'), findsOneWidget);
   });
 }

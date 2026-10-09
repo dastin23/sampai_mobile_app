@@ -29,7 +29,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Simpan transaksi. Mengabaikan duplikat id (idempotensi, PRD 6.5).
   void addTransaction(ExpenseTransaction transaction) {
+    if (_transactions.any((t) => t.id == transaction.id)) return;
     _transactions.insert(0, transaction);
     _touch();
     notifyListeners();

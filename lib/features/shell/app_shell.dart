@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../core/state/app_state.dart';
 import '../../core/theme/app_theme.dart';
+import '../add_expense/add_expense_sheet.dart';
 import '../budget/budget_controller.dart';
 import '../budget/budget_screen.dart';
 import '../home/home_controller.dart';
 import '../home/home_screen.dart';
+import '../profil/profil_screen.dart';
+import '../transactions/transactions_controller.dart';
+import '../transactions/transactions_screen.dart';
 
 /// Shell navigasi bawah: Home, Budget, Transaksi, Profil (PRD 5.2.G).
 class AppShell extends StatefulWidget {
@@ -26,30 +30,34 @@ class _AppShellState extends State<AppShell> {
   int _index = 0;
   late final HomeController _homeController;
   late final BudgetController _budgetController;
+  late final TransactionsController _transactionsController;
 
   @override
   void initState() {
     super.initState();
     _homeController = HomeController(widget.appState)..load();
     _budgetController = BudgetController(widget.appState)..load();
+    _transactionsController = TransactionsController(widget.appState)..load();
   }
 
   @override
   void dispose() {
     _homeController.dispose();
     _budgetController.dispose();
+    _transactionsController.dispose();
     super.dispose();
   }
 
   void _goTo(int index) => setState(() => _index = index);
 
-  void _showAddExpenseNotice() {
+  Future<void> _openAddExpense() async {
+    final saved = await showAddExpenseSheet(context, appState: widget.appState);
+    if (saved == null || !mounted) return;
+    widget.appState.addTransaction(saved);
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        const SnackBar(
-          content: Text('Layar Catat pengeluaran menyusul pada iterasi berikutnya.'),
-        ),
+        const SnackBar(content: Text('Pengeluaran tersimpan')),
       );
   }
 
@@ -61,14 +69,20 @@ class _AppShellState extends State<AppShell> {
         child: switch (_index) {
           0 => HomeScreen(
               controller: _homeController,
-              onAddExpense: _showAddExpenseNotice,
+              onAddExpense: _openAddExpense,
               onSeeAllBudgets: () => _goTo(1),
               onSeeAllTransactions: () => _goTo(2),
               onRestartOnboarding: widget.onRestartOnboarding,
             ),
           1 => BudgetScreen(controller: _budgetController),
-          2 => const _ComingSoonScreen(title: 'Transaksi'),
-          _ => const _ComingSoonScreen(title: 'Profil'),
+          2 => TransactionsScreen(
+              controller: _transactionsController,
+              onAddExpense: _openAddExpense,
+            ),
+          _ => ProfilScreen(
+              appState: widget.appState,
+              onRestartOnboarding: widget.onRestartOnboarding,
+            ),
         },
       ),
       bottomNavigationBar: NavigationBar(
@@ -98,29 +112,6 @@ class _AppShellState extends State<AppShell> {
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profil',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ComingSoonScreen extends StatelessWidget {
-  const _ComingSoonScreen({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(title, style: AppTypography.h1),
-          const SizedBox(height: AppSpacing.component),
-          const Text(
-            'Layar ini menyusul pada iterasi berikutnya.',
-            style: AppTypography.body,
           ),
         ],
       ),
