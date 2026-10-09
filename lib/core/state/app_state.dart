@@ -51,6 +51,15 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Hapus seluruh data lokal (dipakai saat mulai ulang pengaturan).
+  void clear() {
+    _plan = null;
+    _transactions.clear();
+    _budgets.clear();
+    _lastUpdatedAt = null;
+    notifyListeners();
+  }
+
   void _touch() => _lastUpdatedAt = DateTime.now();
 
   /// Transaksi yang dihitung terhadap anggaran fleksibel pada siklus [cycle]

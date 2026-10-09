@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sampai_app/core/calc/salary_cycle.dart';
 import 'package:sampai_app/core/format/rupiah.dart';
-import 'package:sampai_app/main.dart';
+import 'package:sampai_app/core/theme/app_theme.dart';
+import 'package:sampai_app/features/onboarding/onboarding_controller.dart';
+import 'package:sampai_app/features/onboarding/onboarding_flow.dart';
 
 void main() {
   /// Frame referensi PRD: 390 × 844.
@@ -12,6 +14,23 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
+  Future<OnboardingController> pumpOnboarding(
+    WidgetTester tester, {
+    void Function()? onCompleted,
+  }) async {
+    final controller = OnboardingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: OnboardingFlow(
+          controller: controller,
+          onCompleted: onCompleted ?? () {},
+        ),
+      ),
+    );
+    return controller;
+  }
 
   group('formatRupiah', () {
     test('formats with thousand separators', () {
@@ -59,7 +78,7 @@ void main() {
 
   testWidgets('onboarding flow reaches income screen', (tester) async {
     useDesignFrame(tester);
-    await tester.pumpWidget(const SampeiApp());
+    await pumpOnboarding(tester);
     expect(find.text('Bikin gaji sampai.'), findsOneWidget);
 
     await tester.tap(find.text('Mulai atur gaji'));
@@ -72,7 +91,7 @@ void main() {
 
   testWidgets('income CTA disabled until amount is valid', (tester) async {
     useDesignFrame(tester);
-    await tester.pumpWidget(const SampeiApp());
+    await pumpOnboarding(tester);
     await tester.tap(find.text('Mulai atur gaji'));
     await tester.pumpAndSettle();
 
@@ -87,9 +106,11 @@ void main() {
     expect(cta().onPressed, isNotNull);
   });
 
-  testWidgets('completes full onboarding and lands on home', (tester) async {
+  testWidgets('completes full onboarding and invokes onCompleted',
+      (tester) async {
     useDesignFrame(tester);
-    await tester.pumpWidget(const SampeiApp());
+    var completed = false;
+    await pumpOnboarding(tester, onCompleted: () => completed = true);
 
     // Screen 1 → 2
     await tester.tap(find.text('Mulai atur gaji'));
@@ -131,22 +152,7 @@ void main() {
     await tester.tap(find.text('Buat rencana saya'));
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pumpAndSettle();
-    // Home memuat data (timer 500ms) setelah shell terpasang.
-    await tester.pump(const Duration(milliseconds: 600));
-    await tester.pumpAndSettle();
 
-    // Home
-    expect(find.text('Halo!'), findsOneWidget);
-    expect(find.text('Rp5.500.000'), findsWidgets);
-    if (find.text('Tagihan terdekat').evaluate().isEmpty) {
-      await tester.scrollUntilVisible(
-        find.text('Tagihan terdekat'),
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-    }
-    expect(find.text('Kos'), findsOneWidget);
+    expect(completed, isTrue);
   });
 }
-

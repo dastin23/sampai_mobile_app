@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
 import 'onboarding_controller.dart';
@@ -15,7 +16,9 @@ class WelcomeScreen extends StatelessWidget {
       backgroundColor: AppColors.canvas,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.pageHorizontal,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -35,6 +38,12 @@ class WelcomeScreen extends StatelessWidget {
               FilledButton(
                 onPressed: () => controller.goTo(OnboardingStep.income),
                 child: const Text('Mulai atur gaji'),
+              ),
+              const SizedBox(height: AppSpacing.component),
+              OutlinedButton.icon(
+                onPressed: () => context.go('/login'),
+                icon: const Icon(Icons.login, size: 20),
+                label: const Text('Sudah punya akun? Masuk'),
               ),
               SizedBox(height: MediaQuery.paddingOf(context).bottom + 16),
             ],
@@ -75,14 +84,20 @@ class _WelcomeVisual extends StatelessWidget {
                   color: AppColors.surface,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.savings_outlined, color: AppColors.primary),
+                child: const Icon(
+                  Icons.savings_outlined,
+                  color: AppColors.primary,
+                ),
               ),
             ),
             Positioned(
               left: 32,
               bottom: 20,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(999),
