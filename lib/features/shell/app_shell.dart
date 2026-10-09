@@ -61,6 +61,17 @@ class _AppShellState extends State<AppShell> {
       );
   }
 
+  Future<void> _openAddIncome() async {
+    final saved = await showAddIncomeSheet(context, appState: widget.appState);
+    if (saved == null || !mounted) return;
+    widget.appState.addTransaction(saved);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Pemasukan tersimpan')),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -70,6 +81,7 @@ class _AppShellState extends State<AppShell> {
           0 => HomeScreen(
               controller: _homeController,
               onAddExpense: _openAddExpense,
+              onAddIncome: _openAddIncome,
               onSeeAllBudgets: () => _goTo(1),
               onSeeAllTransactions: () => _goTo(2),
               onRestartOnboarding: widget.onRestartOnboarding,
@@ -78,6 +90,7 @@ class _AppShellState extends State<AppShell> {
           2 => TransactionsScreen(
               controller: _transactionsController,
               onAddExpense: _openAddExpense,
+              onAddIncome: _openAddIncome,
             ),
           _ => ProfilScreen(
               appState: widget.appState,

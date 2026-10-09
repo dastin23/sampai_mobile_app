@@ -45,6 +45,15 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Ganti seluruh transaksi (dipakai saat hydrate dari backend).
+  void replaceTransactions(List<ExpenseTransaction> transactions) {
+    _transactions
+      ..clear()
+      ..addAll(transactions);
+    _touch();
+    notifyListeners();
+  }
+
   /// Tandai data diperbarui (mis. setelah sinkronisasi terkonfirmasi).
   void touch() {
     _touch();

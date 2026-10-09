@@ -8,6 +8,7 @@ import '../../../core/theme/category_icons.dart';
 
 /// Satu baris transaksi: ikon kategori, judul, kategori, jumlah, dan hari relatif.
 /// Dipakai Home ("Transaksi terbaru") dan layar Transaksi.
+/// Pemasukan ditampilkan dengan tanda "+" dan warna [AppColors.successText].
 class TransactionTile extends StatelessWidget {
   const TransactionTile({
     super.key,
@@ -20,6 +21,7 @@ class TransactionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isIncome = transaction.isIncome;
     return Row(
       children: [
         Container(
@@ -30,9 +32,11 @@ class TransactionTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
-            categoryIcon(transaction.category),
+            isIncome
+                ? incomeCategoryIcon(transaction.category)
+                : categoryIcon(transaction.category),
             size: 20,
-            color: AppColors.primary,
+            color: isIncome ? AppColors.successText : AppColors.primary,
           ),
         ),
         const SizedBox(width: 12),
@@ -58,8 +62,12 @@ class TransactionTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '−${formatRupiah(transaction.amount)}',
-              style: AppTypography.bodyStrong,
+              isIncome
+                  ? '+${formatRupiah(transaction.amount)}'
+                  : '−${formatRupiah(transaction.amount)}',
+              style: AppTypography.bodyStrong.copyWith(
+                color: isIncome ? AppColors.successText : null,
+              ),
             ),
             Text(
               formatRelativeDay(transaction.date, today),

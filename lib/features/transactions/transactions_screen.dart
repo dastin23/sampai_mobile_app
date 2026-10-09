@@ -13,10 +13,12 @@ class TransactionsScreen extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onAddExpense,
+    required this.onAddIncome,
   });
 
   final TransactionsController controller;
   final VoidCallback onAddExpense;
+  final VoidCallback onAddIncome;
 
   @override
   State<TransactionsScreen> createState() => _TransactionsScreenState();
@@ -56,10 +58,24 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 AppSpacing.pageHorizontal,
                 AppSpacing.componentWide,
               ),
-              child: FilledButton.icon(
-                onPressed: widget.onAddExpense,
-                icon: const Icon(Icons.add, size: 22),
-                label: const Text('Catat pengeluaran'),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: widget.onAddIncome,
+                      icon: const Icon(Icons.arrow_downward, size: 20),
+                      label: const Text('Catat pemasukan'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.component),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: widget.onAddExpense,
+                      icon: const Icon(Icons.add, size: 22),
+                      label: const Text('Catat pengeluaran'),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -192,6 +208,15 @@ class _SummaryCard extends StatelessWidget {
             '${formatRupiah(data.remainingFlexible)}',
             style: AppTypography.bodyStrong,
           ),
+          if (data.totalIncome > 0) ...[
+            const SizedBox(height: AppSpacing.component),
+            Text(
+              'Pemasukan tercatat ${formatRupiah(data.totalIncome)}',
+              style: AppTypography.bodyStrong.copyWith(
+                color: AppColors.successText,
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -47,7 +47,7 @@ class TransactionsData {
       isEstimate: cycleTx.isEmpty,
     );
 
-    final sorted = [...cycleTx]
+    final sorted = [...transactionsInCycle(transactions, cycle)]
       ..sort((a, b) => b.date.compareTo(a.date));
 
     return TransactionsData(
@@ -62,13 +62,18 @@ class TransactionsData {
   final SalaryCycle cycle;
   final FinancialSummary summary;
 
-  /// Transaksi fleksibel dalam siklus, terbaru di atas.
+  /// Transaksi dalam siklus (pengeluaran + pemasukan), terbaru di atas.
   final List<ExpenseTransaction> transactions;
 
   bool get isEmpty => transactions.isEmpty;
 
   /// Total terpakai terhadap anggaran fleksibel siklus.
   int get totalSpent => summary.discretionarySpent;
+
+  /// Total pemasukan tercatat dalam siklus.
+  int get totalIncome => transactions
+      .where((t) => t.isIncome)
+      .fold(0, (sum, t) => sum + t.amount);
 
   /// Sisa anggaran fleksibel; tidak pernah negatif.
   int get remainingFlexible => summary.remainingFlexible;

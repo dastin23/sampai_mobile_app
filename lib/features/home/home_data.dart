@@ -83,7 +83,7 @@ class HomeData {
         ),
     ];
 
-    final recent = flexibleTransactionsIn(transactions, cycle)
+    final recent = transactionsInCycle(transactions, cycle)
       ..sort((a, b) => b.date.compareTo(a.date));
 
     final bills = <UpcomingBill>[];

@@ -2,14 +2,28 @@ import '../models/plan.dart';
 import 'salary_cycle.dart';
 
 /// Transaksi yang dihitung terhadap anggaran fleksibel (PRD 8.5)
-/// dan jatuh dalam [cycle] (inklusif).
+/// dan jatuh dalam [cycle] (inklusif). Pemasukan tidak pernah ikut.
 List<ExpenseTransaction> flexibleTransactionsIn(
   List<ExpenseTransaction> transactions,
   SalaryCycle cycle,
 ) {
   final result = <ExpenseTransaction>[];
   for (final t in transactions) {
-    if (!t.countsTowardFlexibleBudget) continue;
+    if (t.isIncome || !t.countsTowardFlexibleBudget) continue;
+    final date = DateTime(t.date.year, t.date.month, t.date.day);
+    if (date.isBefore(cycle.start) || date.isAfter(cycle.end)) continue;
+    result.add(t);
+  }
+  return result;
+}
+
+/// Seluruh transaksi (pengeluaran + pemasukan) dalam siklus.
+List<ExpenseTransaction> transactionsInCycle(
+  List<ExpenseTransaction> transactions,
+  SalaryCycle cycle,
+) {
+  final result = <ExpenseTransaction>[];
+  for (final t in transactions) {
     final date = DateTime(t.date.year, t.date.month, t.date.day);
     if (date.isBefore(cycle.start) || date.isAfter(cycle.end)) continue;
     result.add(t);
@@ -23,6 +37,15 @@ int discretionarySpent(
   SalaryCycle cycle,
 ) =>
     flexibleTransactionsIn(transactions, cycle)
+        .fold(0, (sum, t) => sum + t.amount);
+
+/// Total pemasukan tercatat dalam siklus.
+int totalIncome(
+  List<ExpenseTransaction> transactions,
+  SalaryCycle cycle,
+) =>
+    transactionsInCycle(transactions, cycle)
+        .where((t) => t.isIncome)
         .fold(0, (sum, t) => sum + t.amount);
 
 /// Total pengeluaran fleksibel satu kategori dalam siklus.

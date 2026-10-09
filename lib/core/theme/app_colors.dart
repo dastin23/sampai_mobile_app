@@ -11,5 +11,6 @@ abstract final class AppColors {
   static const Color warning = Color(0xFFFFF0D7);
   static const Color criticalBackground = Color(0xFFFBE8E7);
   static const Color criticalText = Color(0xFFA32925);
+  static const Color successText = Color(0xFF147A3B);
   static const Color disabled = Color(0xFFD9DCD7);
 }

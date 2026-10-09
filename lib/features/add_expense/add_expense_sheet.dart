@@ -8,11 +8,80 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/category_icons.dart';
 import 'add_expense_controller.dart';
 
-/// Bottom sheet "Catat pengeluaran" (PRD 6).
+/// Jenis transaksi yang dicatat lewat sheet.
+enum TransactionKind { expense, income }
+
+/// Label dan pilihan kategori yang bergantung pada jenis transaksi.
+class _SheetCopy {
+  const _SheetCopy({
+    required this.title,
+    required this.noteLabel,
+    required this.noteHint,
+    required this.categoryError,
+    required this.actionLabel,
+    required this.categories,
+  });
+
+  final String title;
+  final String noteLabel;
+  final String noteHint;
+  final String categoryError;
+  final String actionLabel;
+  final Map<String, IconData> categories;
+}
+
+_SheetCopy _sheetCopy(TransactionKind kind) => switch (kind) {
+      TransactionKind.expense => const _SheetCopy(
+        title: 'Catat pengeluaran',
+        noteLabel: 'Beli apa? (opsional)',
+        noteHint: 'Contoh: makan siang',
+        categoryError: 'Pilih kategori pengeluaran.',
+        actionLabel: 'Simpan pengeluaran',
+        categories: categoryIcons,
+      ),
+      TransactionKind.income => const _SheetCopy(
+        title: 'Catat pemasukan',
+        noteLabel: 'Dari mana? (opsional)',
+        noteHint: 'Contoh: gaji tambahan',
+        categoryError: 'Pilih kategori pemasukan.',
+        actionLabel: 'Simpan pemasukan',
+        categories: incomeCategoryIcons,
+      ),
+    };
+
+/// Buka sheet "Catat pengeluaran" (PRD 6).
 ///
 /// Return transaksi tersimpan, atau [null] bila ditutup tanpa menyimpan.
 Future<ExpenseTransaction?> showAddExpenseSheet(
   BuildContext context, {
+  required AppState appState,
+  AddExpenseController? controller,
+}) {
+  return _showTransactionSheet(
+    context,
+    kind: TransactionKind.expense,
+    appState: appState,
+    controller: controller,
+  );
+}
+
+/// Buka sheet "Catat pemasukan".
+Future<ExpenseTransaction?> showAddIncomeSheet(
+  BuildContext context, {
+  required AppState appState,
+  AddIncomeController? controller,
+}) {
+  return _showTransactionSheet(
+    context,
+    kind: TransactionKind.income,
+    appState: appState,
+    controller: controller,
+  );
+}
+
+Future<ExpenseTransaction?> _showTransactionSheet(
+  BuildContext context, {
+  required TransactionKind kind,
   required AppState appState,
   AddExpenseController? controller,
 }) {
@@ -24,9 +93,12 @@ Future<ExpenseTransaction?> showAddExpenseSheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     builder: (context) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SafeArea(
-        child: _AddExpenseSheet(
+        child: _AddTransactionSheet(
+          kind: kind,
           appState: appState,
           controller: controller,
         ),
@@ -35,17 +107,22 @@ Future<ExpenseTransaction?> showAddExpenseSheet(
   );
 }
 
-class _AddExpenseSheet extends StatefulWidget {
-  const _AddExpenseSheet({required this.appState, this.controller});
+class _AddTransactionSheet extends StatefulWidget {
+  const _AddTransactionSheet({
+    required this.kind,
+    required this.appState,
+    this.controller,
+  });
 
+  final TransactionKind kind;
   final AppState appState;
   final AddExpenseController? controller;
 
   @override
-  State<_AddExpenseSheet> createState() => _AddExpenseSheetState();
+  State<_AddTransactionSheet> createState() => _AddTransactionSheetState();
 }
 
-class _AddExpenseSheetState extends State<_AddExpenseSheet> {
+class _AddTransactionSheetState extends State<_AddTransactionSheet> {
   late final AddExpenseController _controller;
   late final bool _ownsController;
   final TextEditingController _amountController = TextEditingController();
@@ -57,11 +134,19 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
   String? _categoryError;
   bool _saved = false;
 
+  TransactionKind get _kind => widget.kind;
+
+  _SheetCopy get _copy => _sheetCopy(_kind);
+
   @override
   void initState() {
     super.initState();
     _ownsController = widget.controller == null;
-    _controller = widget.controller ?? AddExpenseController(widget.appState);
+    _controller =
+        widget.controller ??
+        (_kind == TransactionKind.income
+            ? AddIncomeController(widget.appState)
+            : AddExpenseController(widget.appState));
     _controller.addListener(_onControllerChanged);
     _date = _normalizedNow();
   }
@@ -95,7 +180,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('Buang pengeluaran ini?'),
+        title: Text('Buang ${_kind == TransactionKind.income ? 'pemasukan' : 'pengeluaran'} ini?'),
         content: const Text(
           'Jumlah dan catatan yang belum disimpan akan hilang.',
           style: AppTypography.body,
@@ -145,7 +230,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
       errors.add('amount');
     }
     if (_category == null) {
-      setState(() => _categoryError = 'Pilih kategori pengeluaran.');
+      setState(() => _categoryError = _copy.categoryError);
       errors.add('category');
     }
     if (errors.isNotEmpty) return;
@@ -196,8 +281,8 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
               const SizedBox(height: AppSpacing.component),
               Row(
                 children: [
-                  const Expanded(
-                    child: Text('Catat pengeluaran', style: AppTypography.h2),
+                  Expanded(
+                    child: Text(_copy.title, style: AppTypography.h2),
                   ),
                   IconButton(
                     onPressed: _close,
@@ -254,10 +339,11 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
                 crossAxisSpacing: 12,
                 mainAxisExtent: 90,
                 children: [
-                  for (final category in categoryIcons.keys)
+                  for (final category in _copy.categories.keys)
                     _CategoryTile(
                       category: category,
                       selected: _category == category,
+                      icon: _copy.categories[category]!,
                       onTap: () {
                         setState(() {
                           _category = category;
@@ -271,9 +357,9 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
               TextField(
                 controller: _noteController,
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Beli apa? (opsional)',
-                  hintText: 'Contoh: makan siang',
+                decoration: InputDecoration(
+                  labelText: _copy.noteLabel,
+                  hintText: _copy.noteHint,
                 ),
               ),
               const SizedBox(height: AppSpacing.componentWide),
@@ -353,7 +439,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
                           Text('Menyimpan…'),
                         ],
                       )
-                    : const Text('Simpan pengeluaran'),
+                    : Text(_copy.actionLabel),
               ),
             ],
           ),
@@ -367,11 +453,13 @@ class _CategoryTile extends StatelessWidget {
   const _CategoryTile({
     required this.category,
     required this.selected,
+    required this.icon,
     required this.onTap,
   });
 
   final String category;
   final bool selected;
+  final IconData icon;
   final VoidCallback onTap;
 
   @override
@@ -395,7 +483,7 @@ class _CategoryTile extends StatelessWidget {
               ),
             ),
             child: Icon(
-              categoryIcon(category),
+              icon,
               size: 26,
               color: AppColors.primary,
             ),

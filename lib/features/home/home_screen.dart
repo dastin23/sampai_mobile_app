@@ -12,6 +12,7 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onAddExpense,
+    required this.onAddIncome,
     required this.onSeeAllBudgets,
     required this.onSeeAllTransactions,
     required this.onRestartOnboarding,
@@ -19,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 
   final HomeController controller;
   final VoidCallback onAddExpense;
+  final VoidCallback onAddIncome;
   final VoidCallback onSeeAllBudgets;
   final VoidCallback onSeeAllTransactions;
   final VoidCallback onRestartOnboarding;
@@ -164,10 +166,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 AppSpacing.pageHorizontal,
                 AppSpacing.componentWide,
               ),
-              child: FilledButton.icon(
-                onPressed: widget.onAddExpense,
-                icon: const Icon(Icons.add, size: 22),
-                label: const Text('Catat pengeluaran'),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: widget.onAddIncome,
+                      icon: const Icon(Icons.arrow_downward, size: 20),
+                      label: const Text('Catat pemasukan'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.component),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: widget.onAddExpense,
+                      icon: const Icon(Icons.add, size: 22),
+                      label: const Text('Catat pengeluaran'),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

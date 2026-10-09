@@ -74,7 +74,19 @@ class ExpenseTransaction {
     required this.amount,
     required this.date,
     this.countsTowardFlexibleBudget = true,
+    this.isIncome = false,
   });
+
+  /// Transaksi pemasukan: tidak pernah dihitung ke anggaran fleksibel
+  /// maupun pemakaian kategori.
+  const ExpenseTransaction.income({
+    required this.id,
+    required this.title,
+    required this.category,
+    required this.amount,
+    required this.date,
+  })  : countsTowardFlexibleBudget = false,
+        isIncome = true;
 
   final String id;
   final String title;
@@ -85,6 +97,9 @@ class ExpenseTransaction {
   /// Pengeluaran yang dikecualikan dari anggaran fleksibel
   /// (mis. transfer) harus bernilai false — PRD 8.5.
   final bool countsTowardFlexibleBudget;
+
+  /// True untuk transaksi pemasukan (gaji tambahan, bonus, dll).
+  final bool isIncome;
 }
 
 /// Alokasi batas kategori (diubah lewat layar Budget).

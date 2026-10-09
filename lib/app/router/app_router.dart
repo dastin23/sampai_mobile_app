@@ -9,6 +9,7 @@ import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/providers/auth_providers.dart';
 import '../../features/onboarding/onboarding_flow.dart';
 import '../../features/shell/app_shell.dart';
+import '../../features/sync/providers/app_data_providers.dart';
 import '../state/app_providers.dart';
 
 /// Menyalakan ulang GoRouter setiap kali stream autentikasi berubah sehingga
@@ -32,6 +33,25 @@ class GoRouterRefreshStream extends ChangeNotifier {
 final appRouterProvider = Provider<GoRouter>((ref) {
   final auth = ref.read(authRepositoryProvider);
   final refresh = GoRouterRefreshStream(auth.authStateChanges);
+
+  // Aktifkan write-through data Home ke Supabase sepanjang sesi.
+  ref.read(appDataSyncProvider);
+
+  // Saat status autentikasi berubah: muat/hapus rencana dari backend.
+  late final StreamSubscription<dynamic> authSub;
+  authSub = auth.authStateChanges.listen((_) {
+    final notifier = ref.read(onboardedProvider.notifier);
+    if (auth.isAuthenticated) {
+      unawaited(notifier.hydrate());
+    } else {
+      notifier.reset();
+    }
+  });
+
+  // Kembali login dengan sesi tersimpan tanpa event baru.
+  if (auth.isAuthenticated) {
+    unawaited(ref.read(onboardedProvider.notifier).hydrate());
+  }
 
   // Saat status onboarding berubah, redirect ikut dievaluasi.
   ref.listen(onboardedProvider, (_, _) {
@@ -77,6 +97,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 
   ref.onDispose(() {
+    authSub.cancel();
     router.dispose();
     refresh.dispose();
   });

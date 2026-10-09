@@ -14,3 +14,15 @@ const Map<String, IconData> categoryIcons = {
 
 IconData categoryIcon(String category) =>
     categoryIcons[category] ?? Icons.category_outlined;
+
+/// Ikon kategori pemasukan (form Catat pemasukan).
+const Map<String, IconData> incomeCategoryIcons = {
+  'Gaji': Icons.payments_outlined,
+  'Bonus': Icons.card_giftcard_outlined,
+  'Sampingan': Icons.work_outline,
+  'Hadiah': Icons.redeem_outlined,
+  'Lainnya': Icons.category_outlined,
+};
+
+IconData incomeCategoryIcon(String category) =>
+    incomeCategoryIcons[category] ?? Icons.category_outlined;

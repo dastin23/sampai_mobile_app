@@ -5,7 +5,7 @@ import '../../core/state/app_state.dart';
 
 enum ExpenseSaveStatus { idle, saving, success, error }
 
-/// Penyimpanan transaksi Add Expense (PRD 6.5).
+/// Penyimpanan transaksi (PRD 6.5) untuk pengeluaran maupun pemasukan.
 ///
 /// - Mencegah double submit berulang selama [save] berjalan.
 /// - Idempotensi tambahan: [AppState.addTransaction] mengabaikan transaksi
@@ -15,6 +15,11 @@ class AddExpenseController extends ChangeNotifier {
 
   final AppState _appState;
   final bool simulateFailure;
+
+  /// True untuk transaksi pemasukan (dipakai [AddIncomeController]).
+  bool get isIncome => false;
+
+  String get _idPrefix => isIncome ? 'income-' : 'expense-';
 
   ExpenseSaveStatus _status = ExpenseSaveStatus.idle;
   ExpenseSaveStatus get status => _status;
@@ -40,16 +45,33 @@ class AddExpenseController extends ChangeNotifier {
     }
 
     final trimmedNote = note.trim();
-    final transaction = ExpenseTransaction(
-      id: 'expense-${DateTime.now().microsecondsSinceEpoch}-$amount',
-      title: trimmedNote.isEmpty ? category : trimmedNote,
-      category: category,
-      amount: amount,
-      date: date,
-    );
+    final transaction = isIncome
+        ? ExpenseTransaction.income(
+            id: '$_idPrefix${DateTime.now().microsecondsSinceEpoch}-$amount',
+            title: trimmedNote.isEmpty ? category : trimmedNote,
+            category: category,
+            amount: amount,
+            date: date,
+          )
+        : ExpenseTransaction(
+            id: '$_idPrefix${DateTime.now().microsecondsSinceEpoch}-$amount',
+            title: trimmedNote.isEmpty ? category : trimmedNote,
+            category: category,
+            amount: amount,
+            date: date,
+          );
     _appState.addTransaction(transaction);
     _status = ExpenseSaveStatus.success;
     notifyListeners();
     return transaction;
   }
+}
+
+/// Penyimpanan transaksi pemasukan — sama dengan pengeluaran, hanya
+/// menandai [ExpenseTransaction.isIncome].
+class AddIncomeController extends AddExpenseController {
+  AddIncomeController(super.appState, {super.simulateFailure});
+
+  @override
+  bool get isIncome => true;
 }
