@@ -20,7 +20,8 @@ class FakeAuthRepository implements AuthRepository {
   AuthOutcome signInResult = const AuthOutcome.success();
   AuthOutcome signUpResult = const AuthOutcome.success();
 
-  final List<(String, String)> called = [];
+  final List<(String, String)> logins = [];
+  final List<(String, String, String)> registrations = [];
   final StreamController<AuthState> _authController =
       StreamController<AuthState>.broadcast();
 
@@ -38,17 +39,18 @@ class FakeAuthRepository implements AuthRepository {
     required String email,
     required String password,
   }) async {
-    called.add((email, password));
+    logins.add((email, password));
     if (signInResult.isSuccess) authenticated = true;
     return signInResult;
   }
 
   @override
   Future<AuthOutcome> signUp({
+    required String fullName,
     required String email,
     required String password,
   }) async {
-    called.add((email, password));
+    registrations.add((fullName, email, password));
     if (signUpResult.isSuccess) authenticated = true;
     return signUpResult;
   }
@@ -94,12 +96,18 @@ void main() {
     required String email,
     required String password,
     String? confirm,
-    bool onRegister = false,
+    String? name,
   }) async {
-    await tester.enterText(find.byType(TextField).at(0), email);
-    await tester.enterText(find.byType(TextField).at(1), password);
-    if (confirm != null) {
-      await tester.enterText(find.byType(TextField).at(2), confirm);
+    if (name != null) {
+      await tester.enterText(find.byType(TextField).at(0), name);
+      await tester.enterText(find.byType(TextField).at(1), email);
+      await tester.enterText(find.byType(TextField).at(2), password);
+      if (confirm != null) {
+        await tester.enterText(find.byType(TextField).at(3), confirm);
+      }
+    } else {
+      await tester.enterText(find.byType(TextField).at(0), email);
+      await tester.enterText(find.byType(TextField).at(1), password);
     }
     await tester.pump();
   }
@@ -116,7 +124,7 @@ void main() {
 
       expect(find.text('Masukkan email.'), findsOneWidget);
       expect(find.text('Masukkan kata sandi.'), findsOneWidget);
-      expect(repo.called, isEmpty);
+      expect(repo.logins, isEmpty);
     });
 
     testWidgets('email tidak valid ditolak', (tester) async {
@@ -133,7 +141,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Masukkan email yang valid.'), findsOneWidget);
-      expect(repo.called, isEmpty);
+      expect(repo.logins, isEmpty);
     });
 
     testWidgets('error dari server ditampilkan pada banner', (tester) async {
@@ -147,8 +155,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Email atau kata sandi salah.'), findsOneWidget);
-      expect(repo.called.single.$1, 'user@mail.com');
-      expect(repo.called.single.$2, 'salah123');
+      expect(repo.logins.single.$1, 'user@mail.com');
+      expect(repo.logins.single.$2, 'salah123');
     });
 
     testWidgets('berhasil masuk diarahkan ke onboarding (belum ada rencana)',
@@ -162,7 +170,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(OnboardingFlow), findsOneWidget);
-      expect(repo.called.single.$1, 'user@mail.com');
+      expect(repo.logins.single.$1, 'user@mail.com');
     });
 
     testWidgets('navigasi ke Daftar dan kembali', (tester) async {
@@ -184,6 +192,28 @@ void main() {
   });
 
   group('RegisterScreen', () {
+    testWidgets('nama lengkap kosong dan pendek ditolak', (tester) async {
+      useDesignFrame(tester);
+      final repo = FakeAuthRepository();
+      await pumpScreen(tester, repo, const RegisterScreen());
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Daftar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Masukkan nama lengkap.'), findsOneWidget);
+
+      await enterAuthFields(
+        tester,
+        name: 'A',
+        email: 'new@mail.com',
+        password: 'secret123',
+        confirm: 'secret123',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Daftar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nama minimal 2 karakter.'), findsOneWidget);
+      expect(repo.registrations, isEmpty);
+    });
+
     testWidgets('kata sandi pendek dan tidak sama ditolak', (tester) async {
       useDesignFrame(tester);
       final repo = FakeAuthRepository();
@@ -191,6 +221,7 @@ void main() {
 
       await enterAuthFields(
         tester,
+        name: 'Budi Santoso',
         email: 'new@mail.com',
         password: '123',
         confirm: '456',
@@ -200,7 +231,7 @@ void main() {
 
       expect(find.text('Kata sandi minimal 6 karakter.'), findsOneWidget);
       expect(find.text('Kata sandi tidak sama.'), findsOneWidget);
-      expect(repo.called, isEmpty);
+      expect(repo.registrations, isEmpty);
     });
 
     testWidgets('error dari server ditampilkan pada banner', (tester) async {
@@ -211,6 +242,7 @@ void main() {
 
       await enterAuthFields(
         tester,
+        name: 'Budi Santoso',
         email: 'new@mail.com',
         password: 'secret123',
         confirm: 'secret123',
@@ -219,7 +251,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Email sudah terdaftar.'), findsOneWidget);
-      expect(repo.called.single.$1, 'new@mail.com');
+      expect(repo.registrations.single.$1, 'Budi Santoso');
+      expect(repo.registrations.single.$2, 'new@mail.com');
     });
 
     testWidgets('verifikasi email ditampilkan tanpa keluar dari halaman',
@@ -233,6 +266,7 @@ void main() {
       await tester.pumpAndSettle();
       await enterAuthFields(
         tester,
+        name: 'Budi Santoso',
         email: 'new@mail.com',
         password: 'secret123',
         confirm: 'secret123',
@@ -253,6 +287,7 @@ void main() {
       await tester.pumpAndSettle();
       await enterAuthFields(
         tester,
+        name: 'Budi Santoso',
         email: 'new@mail.com',
         password: 'secret123',
         confirm: 'secret123',
@@ -261,7 +296,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(OnboardingFlow), findsOneWidget);
-      expect(repo.called.single.$1, 'new@mail.com');
+      expect(repo.registrations.single.$1, 'Budi Santoso');
+      expect(repo.registrations.single.$2, 'new@mail.com');
     });
   });
 

@@ -19,6 +19,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+  final TextEditingController _name = TextEditingController();
   final TextEditingController _email = TextEditingController();
   final TextEditingController _password = TextEditingController();
   final TextEditingController _confirm = TextEditingController();
@@ -32,9 +33,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String? _confirmError;
   String? _serverError;
   String? _infoMessage;
+  String? _nameError;
 
   @override
   void dispose() {
+    _name.dispose();
     _email.dispose();
     _password.dispose();
     _confirm.dispose();
@@ -42,10 +45,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   bool _validate() {
+    final name = _name.text.trim();
     final email = _email.text.trim();
     final password = _password.text;
     final confirm = _confirm.text;
     setState(() {
+      _nameError = name.isEmpty
+          ? 'Masukkan nama lengkap.'
+          : (name.length < 2 ? 'Nama minimal 2 karakter.' : null);
       _emailError = email.isEmpty
           ? 'Masukkan email.'
           : (_emailRegExp.hasMatch(email)
@@ -59,7 +66,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           : (confirm != password ? 'Kata sandi tidak sama.' : null);
       _serverError = null;
     });
-    return _emailError == null &&
+    return name.length >= 2 &&
+        _emailError == null &&
         _passwordError == null &&
         _confirmError == null;
   }
@@ -71,9 +79,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _loading = true;
       _infoMessage = null;
     });
+
     final result = await ref
         .read(authRepositoryProvider)
-        .signUp(email: _email.text, password: _password.text);
+        .signUp(
+          fullName: _name.text.trim(),
+          email: _email.text.trim(),
+          password: _password.text,
+        );
     if (!mounted) return;
     if (result.isSuccess) {
       context.go('/home');
@@ -97,11 +110,34 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return AuthScaffold(
       onBack: () => context.go('/login'),
       heading: 'Daftar',
-      helper: 'Buat akun gratis. Data rencanamu tersimpan secara terpisah '
+      helper:
+          'Buat akun gratis. Data rencanamu tersimpan secara terpisah '
           'per akun.',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          TextField(
+            controller: _name,
+            enabled: !_loading,
+            keyboardType: TextInputType.name,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.name],
+            decoration: InputDecoration(
+              labelText: 'Nama lengkap',
+              hintText: 'Masukkan nama lengkap',
+              errorText: _nameError,
+            ),
+            onChanged: (_) {
+              if (_nameError != null || _serverError != null) {
+                setState(() {
+                  _nameError = null;
+                  _serverError = null;
+                });
+              }
+            },
+          ),
+          const SizedBox(height: AppSpacing.componentWide),
           TextField(
             controller: _email,
             enabled: !_loading,

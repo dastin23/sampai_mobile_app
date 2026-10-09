@@ -9,13 +9,11 @@ enum AuthStatus { success, requiresConfirmation, failure }
 /// Hasil operasi autentikasi. [error] terisi hanya saat [failure].
 @immutable
 class AuthOutcome {
-  const AuthOutcome.success()
-      : status = AuthStatus.success,
-        error = null;
+  const AuthOutcome.success() : status = AuthStatus.success, error = null;
 
   const AuthOutcome.requiresConfirmation()
-      : status = AuthStatus.requiresConfirmation,
-        error = null;
+    : status = AuthStatus.requiresConfirmation,
+      error = null;
 
   const AuthOutcome.failure(this.error) : status = AuthStatus.failure;
 
@@ -34,14 +32,12 @@ abstract interface class AuthRepository {
 
   Stream<AuthState> get authStateChanges;
 
-  Future<AuthOutcome> signIn({
-    required String email,
-    required String password,
-  });
+  Future<AuthOutcome> signIn({required String email, required String password});
 
   Future<AuthOutcome> signUp({
     required String email,
     required String password,
+    required String fullName,
   });
 
   Future<void> signOut();
@@ -49,7 +45,8 @@ abstract interface class AuthRepository {
 
 /// Implementasi Supabase Auth (PRD 4.2).
 class SupabaseAuthRepository implements AuthRepository {
-  SupabaseAuthRepository({SupabaseClient? client}) : _client = client ?? supabase;
+  SupabaseAuthRepository({SupabaseClient? client})
+    : _client = client ?? supabase;
 
   final SupabaseClient _client;
 
@@ -84,17 +81,25 @@ class SupabaseAuthRepository implements AuthRepository {
 
   @override
   Future<AuthOutcome> signUp({
+    required String fullName,
     required String email,
     required String password,
   }) async {
     try {
+      if (fullName.trim().length < 2) {
+        return const AuthOutcome.failure('Nama lengkap minimal 2 karakter.');
+      }
+
       final result = await _client.auth.signUp(
         email: email.trim(),
         password: password,
+        data: {'full_name': fullName.trim()},
       );
+
       if (result.session == null) {
         return const AuthOutcome.requiresConfirmation();
       }
+
       return const AuthOutcome.success();
     } on AuthException catch (e) {
       return AuthOutcome.failure(
