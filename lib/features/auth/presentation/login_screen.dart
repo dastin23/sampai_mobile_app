@@ -131,6 +131,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             const SizedBox(height: AppSpacing.section),
             AuthErrorBanner(message: _serverError!),
           ],
+          const SizedBox(height: AppSpacing.component),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _loading ? null : () => context.go('/forgot-password'),
+              child: const Text('Lupa kata sandi?'),
+            ),
+          ),
         ],
       ),
       footer: Column(

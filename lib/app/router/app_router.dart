@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
+import '../../features/auth/presentation/set_new_password_screen.dart';
 import '../../features/auth/providers/auth_providers.dart';
+import '../../features/auth/providers/password_reset_provider.dart';
 import '../../features/onboarding/onboarding_flow.dart';
 import '../../features/shell/app_shell.dart';
 import '../../features/sync/providers/app_data_providers.dart';
@@ -38,12 +42,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.read(appDataSyncProvider);
 
   // Saat status autentikasi berubah: muat/hapus rencana dari backend.
+  // Khusus `passwordRecovery`, jangan hydrate — kunci user di
+  // `/set-new-password` lalu refresh explicit agar redirect dievaluasi.
   late final StreamSubscription<dynamic> authSub;
-  authSub = auth.authStateChanges.listen((_) {
+  authSub = auth.authStateChanges.listen((payload) {
     final notifier = ref.read(onboardedProvider.notifier);
-    if (auth.isAuthenticated) {
+    final pending = ref.read(pendingPasswordResetProvider.notifier);
+    if (payload.event == AuthChangeEvent.passwordRecovery) {
+      pending.markFromRecovery();
+      refresh.notify();
+    } else if (auth.isAuthenticated) {
       unawaited(notifier.hydrate());
     } else {
+      pending.clear();
       notifier.reset();
     }
   });
@@ -64,15 +75,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final loggedIn = auth.isAuthenticated;
       final onboarded = ref.read(onboardedProvider);
+      final pendingReset = ref.read(pendingPasswordResetProvider);
       final location = state.matchedLocation;
-      final isAuthRoute = location == '/login' || location == '/register';
+      final isAuthRoute =
+          location == '/login' ||
+          location == '/register' ||
+          location == '/forgot-password';
 
       if (!loggedIn) {
         return isAuthRoute ? null : '/login';
       }
 
-      // Sudah login — jangan tampilkan halaman login/register.
-      if (isAuthRoute) {
+      // Sesi dari link reset: kunci di layar setel kata sandi baru.
+      if (pendingReset) {
+        return location == '/set-new-password' ? null : '/set-new-password';
+      }
+
+      // Sudah login — jangan tampilkan halaman login/register/reset.
+      if (isAuthRoute || location == '/set-new-password') {
         return onboarded ? '/home' : '/onboarding';
       }
 
@@ -87,6 +107,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/set-new-password',
+        builder: (context, state) => const SetNewPasswordScreen(),
       ),
       GoRoute(path: '/onboarding', builder: (context, state) => const _OnboardingPage()),
       GoRoute(

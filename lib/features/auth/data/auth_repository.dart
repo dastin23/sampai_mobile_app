@@ -40,6 +40,12 @@ abstract interface class AuthRepository {
     required String fullName,
   });
 
+  /// Kirim email reset kata sandi lewat Supabase Auth.
+  Future<AuthOutcome> resetPassword({required String email});
+
+  /// Terapkan kata sandi baru (dipakai saat sesi recovery/reset).
+  Future<AuthOutcome> updatePassword({required String password});
+
   Future<void> signOut();
 }
 
@@ -107,6 +113,48 @@ class SupabaseAuthRepository implements AuthRepository {
       );
     } catch (_) {
       return const AuthOutcome.failure('Belum berhasil mendaftar. Coba lagi.');
+    }
+  }
+
+  @override
+  Future<AuthOutcome> resetPassword({required String email}) async {
+    try {
+      await _client.auth.resetPasswordForEmail(
+        email.trim(),
+        redirectTo: _resetRedirectTo(),
+      );
+      return const AuthOutcome.success();
+    } on AuthException catch (e) {
+      return AuthOutcome.failure(
+        friendlyAuthError(e, fallback: 'Belum berhasil mengirim link. Coba lagi.'),
+      );
+    } catch (_) {
+      return const AuthOutcome.failure('Belum berhasil mengirim link. Coba lagi.');
+    }
+  }
+
+  /// Redirect URL ke aplikasi hanya di Android (konfigurasi deep link
+  /// `sampai://` dipasang di AndroidManifest). Platform lain memakai alur
+  /// default (Site URL dashboard) agar web/desktop tidak rusak.
+  String? _resetRedirectTo() =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+      ? sampaiAuthRedirectUrl
+      : null;
+
+  @override
+  Future<AuthOutcome> updatePassword({required String password}) async {
+    try {
+      if (password.length < 6) {
+        return const AuthOutcome.failure('Kata sandi minimal 6 karakter.');
+      }
+      await _client.auth.updateUser(UserAttributes(password: password));
+      return const AuthOutcome.success();
+    } on AuthException catch (e) {
+      return AuthOutcome.failure(
+        friendlyAuthError(e, fallback: 'Belum berhasil menyimpan. Coba lagi.'),
+      );
+    } catch (_) {
+      return const AuthOutcome.failure('Belum berhasil menyimpan. Coba lagi.');
     }
   }
 

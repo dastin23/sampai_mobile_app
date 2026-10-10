@@ -1,53 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sampai_app/app/state/app_providers.dart';
 import 'package:sampai_app/core/models/plan.dart';
-import 'package:sampai_app/features/auth/data/auth_repository.dart';
 import 'package:sampai_app/features/auth/providers/auth_providers.dart';
 import 'package:sampai_app/features/sync/data/app_data_repository.dart';
 import 'package:sampai_app/features/sync/providers/app_data_providers.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-class FakeAuthRepository implements AuthRepository {
-  bool authenticated = false;
-  final StreamController<AuthState> _authController =
-      StreamController<AuthState>.broadcast();
-
-  @override
-  Session? get currentSession => null;
-
-  @override
-  bool get isAuthenticated => authenticated;
-
-  @override
-  Stream<AuthState> get authStateChanges => _authController.stream;
-
-  @override
-  Future<AuthOutcome> signIn({
-    required String email,
-    required String password,
-  }) async {
-    authenticated = true;
-    return const AuthOutcome.success();
-  }
-
-  @override
-  Future<AuthOutcome> signUp({
-    required String fullName,
-    required String email,
-    required String password,
-  }) async {
-    authenticated = true;
-    return const AuthOutcome.success();
-  }
-
-  @override
-  Future<void> signOut() async {
-    authenticated = false;
-  }
-}
+import 'helpers/fake_auth_repository.dart';
 
 class FakeAppDataRepository implements AppDataRepository {
   AppDataSnapshot snapshotToReturn = const AppDataSnapshot();

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format/date.dart';
 import '../../core/format/rupiah.dart';
 import '../../core/models/plan.dart';
 import '../../core/state/app_state.dart';
 import '../../core/theme/app_theme.dart';
+import '../auth/providers/auth_providers.dart';
 
-/// Profil — ringkasan rencana finansial dan reset pengaturan (tab ke-4).
-class ProfilScreen extends StatelessWidget {
+/// Profil — ringkasan rencana finansial, sinkronisasi akun, dan reset
+/// pengaturan (tab ke-4).
+class ProfilScreen extends ConsumerStatefulWidget {
   const ProfilScreen({
     super.key,
     required this.appState,
@@ -18,7 +21,39 @@ class ProfilScreen extends StatelessWidget {
   final VoidCallback onRestartOnboarding;
 
   @override
+  ConsumerState<ProfilScreen> createState() => _ProfilScreenState();
+}
+
+class _ProfilScreenState extends ConsumerState<ProfilScreen> {
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Keluar akun?'),
+        content: const Text(
+          'Rencana, anggaran, dan transaksi tetap tersimpan di akunmu. '
+          'Kamu akan kembali ke halaman masuk.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await ref.read(authRepositoryProvider).signOut();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final appState = widget.appState;
     return ListenableBuilder(
       listenable: appState,
       builder: (context, _) {
@@ -42,7 +77,9 @@ class ProfilScreen extends StatelessWidget {
             const SizedBox(height: AppSpacing.section),
             if (plan != null) _PlanCard(plan: plan),
             const SizedBox(height: AppSpacing.section),
-            _RestartCard(onRestart: onRestartOnboarding),
+            _AccountCard(onLogout: _confirmLogout),
+            const SizedBox(height: AppSpacing.section),
+            _RestartCard(onRestart: widget.onRestartOnboarding),
           ],
         );
       },
@@ -112,6 +149,46 @@ class _PlanCard extends StatelessWidget {
   }
 }
 
+class _AccountCard extends StatelessWidget {
+  const _AccountCard({required this.onLogout});
+
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Akun', style: AppTypography.h3),
+          const SizedBox(height: AppSpacing.component),
+          const Text(
+            'Rencana, anggaran, dan transaksi tersinkron ke Supabase '
+            'menggunakan akunmu.',
+            style: AppTypography.body,
+          ),
+          const SizedBox(height: AppSpacing.section),
+          OutlinedButton.icon(
+            onPressed: onLogout,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            icon: const Icon(Icons.logout, size: 20),
+            label: const Text('Keluar dari akun'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RestartCard extends StatelessWidget {
   const _RestartCard({required this.onRestart});
 
@@ -124,7 +201,7 @@ class _RestartCard extends StatelessWidget {
         backgroundColor: AppColors.surface,
         title: const Text('Mulai ulang pengaturan?'),
         content: const Text(
-          'Semua data lokal (rencana, anggaran, dan transaksi) akan hilang '
+          'Rencana, anggaran, dan transaksi akan dihapus dari akun ini '
           'dan kamu akan kembali ke onboarding.',
         ),
         actions: [
@@ -155,11 +232,11 @@ class _RestartCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Data lokal', style: AppTypography.h3),
+          const Text('Pengaturan rencana', style: AppTypography.h3),
           const SizedBox(height: AppSpacing.component),
           const Text(
-            'Data tersimpan hanya di perangkat ini. Mulai ulang untuk '
-            'menghapusnya dan mengatur dari awal.',
+            'Mulai ulang untuk menghapus rencana dari akun ini dan '
+            'mengatur dari awal.',
             style: AppTypography.body,
           ),
           const SizedBox(height: AppSpacing.section),

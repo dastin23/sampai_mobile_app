@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,58 +6,15 @@ import 'package:sampai_app/app/sampai_app.dart';
 import 'package:sampai_app/app/state/app_providers.dart';
 import 'package:sampai_app/core/theme/app_theme.dart';
 import 'package:sampai_app/features/auth/data/auth_repository.dart';
+import 'package:sampai_app/features/auth/presentation/forgot_password_screen.dart';
 import 'package:sampai_app/features/auth/presentation/login_screen.dart';
 import 'package:sampai_app/features/auth/presentation/register_screen.dart';
+import 'package:sampai_app/features/auth/presentation/set_new_password_screen.dart';
 import 'package:sampai_app/features/auth/providers/auth_providers.dart';
 import 'package:sampai_app/features/onboarding/onboarding_flow.dart';
 import 'package:sampai_app/features/shell/app_shell.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-class FakeAuthRepository implements AuthRepository {
-  bool authenticated = false;
-  AuthOutcome signInResult = const AuthOutcome.success();
-  AuthOutcome signUpResult = const AuthOutcome.success();
-
-  final List<(String, String)> logins = [];
-  final List<(String, String, String)> registrations = [];
-  final StreamController<AuthState> _authController =
-      StreamController<AuthState>.broadcast();
-
-  @override
-  Session? get currentSession => null;
-
-  @override
-  bool get isAuthenticated => authenticated;
-
-  @override
-  Stream<AuthState> get authStateChanges => _authController.stream;
-
-  @override
-  Future<AuthOutcome> signIn({
-    required String email,
-    required String password,
-  }) async {
-    logins.add((email, password));
-    if (signInResult.isSuccess) authenticated = true;
-    return signInResult;
-  }
-
-  @override
-  Future<AuthOutcome> signUp({
-    required String fullName,
-    required String email,
-    required String password,
-  }) async {
-    registrations.add((fullName, email, password));
-    if (signUpResult.isSuccess) authenticated = true;
-    return signUpResult;
-  }
-
-  @override
-  Future<void> signOut() async {
-    authenticated = false;
-  }
-}
+import 'helpers/fake_auth_repository.dart';
 
 void main() {
   void useDesignFrame(WidgetTester tester) {
@@ -301,6 +256,188 @@ void main() {
     });
   });
 
+  group('ForgotPasswordScreen', () {
+    testWidgets('email kosong atau tidak valid ditolak tanpa memanggil repo',
+        (tester) async {
+      useDesignFrame(tester);
+      final repo = FakeAuthRepository();
+      await pumpScreen(tester, repo, const ForgotPasswordScreen());
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Kirim link reset'));
+      await tester.pumpAndSettle();
+      expect(find.text('Masukkan email.'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'bukan-email');
+      await tester.tap(find.widgetWithText(FilledButton, 'Kirim link reset'));
+      await tester.pumpAndSettle();
+      expect(find.text('Masukkan email yang valid.'), findsOneWidget);
+      expect(repo.resetPasswords, isEmpty);
+    });
+
+    testWidgets('email valid menampilkan konfirmasi dan memanggil repo',
+        (tester) async {
+      useDesignFrame(tester);
+      final repo = FakeAuthRepository();
+      await pumpScreen(tester, repo, const ForgotPasswordScreen());
+
+      await tester.enterText(
+        find.byType(TextField),
+        'user@mail.com',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Kirim link reset'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Link reset telah dikirim ke'), findsOneWidget);
+      expect(repo.resetPasswords.single, 'user@mail.com');
+    });
+
+    testWidgets('error dari server ditampilkan dan input dipertahankan',
+        (tester) async {
+      useDesignFrame(tester);
+      final repo = FakeAuthRepository()
+        ..resetPasswordResult = const AuthOutcome.failure(
+          'Belum berhasil mengirim link. Coba lagi.',
+        );
+      await pumpScreen(tester, repo, const ForgotPasswordScreen());
+
+      await tester.enterText(find.byType(TextField), 'user@mail.com');
+      await tester.tap(find.widgetWithText(FilledButton, 'Kirim link reset'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Belum berhasil mengirim link. Coba lagi.'),
+        findsOneWidget,
+      );
+      expect(find.text('Kirim link reset'), findsOneWidget);
+      expect(repo.resetPasswords.single, 'user@mail.com');
+    });
+
+    testWidgets('navigasi: dari login ke lupa kata sandi lalu kembali',
+        (tester) async {
+      useDesignFrame(tester);
+      final repo = FakeAuthRepository();
+      await pumpApp(tester, repo);
+
+      await tester.tap(find.text('Lupa kata sandi?'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ForgotPasswordScreen), findsOneWidget);
+
+      await tester.tap(find.text('Ingat kata sandi? Masuk'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginScreen), findsOneWidget);
+    });
+  });
+
+  group('SetNewPasswordScreen', () {
+    testWidgets('validasi kosong, pendek, dan tidak sama tanpa memanggil repo',
+        (tester) async {
+      useDesignFrame(tester);
+      final repo = FakeAuthRepository();
+      await pumpScreen(tester, repo, const SetNewPasswordScreen());
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Simpan kata sandi baru'));
+      await tester.pumpAndSettle();
+      expect(find.text('Masukkan kata sandi baru.'), findsOneWidget);
+      expect(find.text('Ulangi kata sandi baru.'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).at(0), '123');
+      await tester.enterText(find.byType(TextField).at(1), '456');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Simpan kata sandi baru'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kata sandi minimal 6 karakter.'), findsOneWidget);
+      expect(find.text('Kata sandi tidak sama.'), findsOneWidget);
+      expect(repo.updatedPasswords, isEmpty);
+    });
+
+    testWidgets('error dari server ditampilkan pada banner', (tester) async {
+      useDesignFrame(tester);
+      final repo = FakeAuthRepository()
+        ..updatePasswordResult = const AuthOutcome.failure(
+          'Belum berhasil menyimpan. Coba lagi.',
+        );
+      await pumpScreen(tester, repo, const SetNewPasswordScreen());
+
+      await tester.enterText(find.byType(TextField).at(0), 'baru123');
+      await tester.enterText(find.byType(TextField).at(1), 'baru123');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Simpan kata sandi baru'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Belum berhasil menyimpan. Coba lagi.'),
+        findsOneWidget,
+      );
+      expect(repo.updatedPasswords.single, 'baru123');
+    });
+
+    testWidgets('recovery mengunci ke /set-new-password dan sukses menuju /home',
+        (tester) async {
+      useDesignFrame(tester);
+      final repo = FakeAuthRepository()..authenticated = false;
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repo)],
+      );
+      addTearDown(container.dispose);
+      container.read(onboardedProvider.notifier).complete();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const SampaiApp()),
+      );
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginScreen), findsOneWidget);
+
+      repo.emitPasswordRecovery();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SetNewPasswordScreen), findsOneWidget);
+      expect(find.byType(AppShell), findsNothing);
+
+      await tester.enterText(find.byType(TextField).at(0), 'baru123');
+      await tester.enterText(find.byType(TextField).at(1), 'baru123');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Simpan kata sandi baru'));
+      await tester.pumpAndSettle();
+
+      expect(repo.updatedPasswords.single, 'baru123');
+      expect(find.byType(AppShell), findsOneWidget);
+      expect(
+        find.textContaining('Kata sandi berhasil diperbarui'),
+        findsOneWidget,
+      );
+
+      // Habiskan timer SnackBar agar tidak tersisa di akhir test.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('tanpa recovery, /set-new-password diarahkan kembali',
+        (tester) async {
+      useDesignFrame(tester);
+      final repo = FakeAuthRepository()..authenticated = true;
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repo)],
+      );
+      addTearDown(container.dispose);
+      container.read(onboardedProvider.notifier).complete();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const SampaiApp()),
+      );
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+      expect(find.byType(AppShell), findsOneWidget);
+
+      container.read(appRouterProvider).go('/set-new-password');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppShell), findsOneWidget);
+      expect(find.byType(SetNewPasswordScreen), findsNothing);
+    });
+  });
+
   group('router redirect', () {
     testWidgets('belum login diarahkan ke /login', (tester) async {
       useDesignFrame(tester);
@@ -351,6 +488,32 @@ void main() {
 
       final router = container.read(appRouterProvider);
       expect(router, isNotNull);
+    });
+
+    testWidgets('logout (SIGNED_OUT) mengembalikan ke /login dan reset state',
+        (tester) async {
+      useDesignFrame(tester);
+      final repo = FakeAuthRepository(authenticated: true);
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repo)],
+      );
+      addTearDown(container.dispose);
+      container.read(onboardedProvider.notifier).complete();
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const SampaiApp()),
+      );
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+      expect(find.byType(AppShell), findsOneWidget);
+      expect(container.read(onboardedProvider), isTrue);
+
+      await repo.signOut();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(container.read(onboardedProvider), isFalse);
+      expect(container.read(appStateProvider).plan, isNull);
     });
   });
 }
