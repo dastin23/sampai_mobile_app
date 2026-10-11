@@ -157,6 +157,7 @@ void main() {
 
     expect(find.text('Mendekati batas'), findsOneWidget);
     expect(find.text('Rp1.000.000 dari Rp1.200.000'), findsOneWidget);
+    expect(find.text('Kategori mendekati batas: 1'), findsOneWidget);
   });
 
   testWidgets('state melebihi anggaran menampilkan jumlah kelebihan', (tester) async {
@@ -165,6 +166,7 @@ void main() {
     await preview(tester, 'Melebihi anggaran');
 
     expect(find.text('Melebihi anggaran Rp100.000'), findsOneWidget);
+    expect(find.text('Kategori melewati anggaran: 1'), findsOneWidget);
   });
 
   testWidgets('state kosong menawarkan atur anggaran', (tester) async {

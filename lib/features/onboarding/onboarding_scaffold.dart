@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/liquid_glass.dart';
 
 /// Top bar onboarding: tombol Kembali (langkah 2–5) + indikator progres
 /// `n dari 4` (PRD 4.1).
@@ -26,10 +27,11 @@ class OnboardingScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.canvas,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      body: AtmosphereBackground(
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 24, 0),
               child: Row(
@@ -89,7 +91,8 @@ class OnboardingScaffold extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -106,11 +109,19 @@ class _ProgressSegments extends StatelessWidget {
         final filled = i < current;
         return Expanded(
           child: Container(
-            height: 6,
+            height: 8,
             margin: i == 0 ? EdgeInsets.zero : const EdgeInsets.only(left: 6),
             decoration: BoxDecoration(
-              color: filled ? AppColors.primary : AppColors.border,
+              color: filled ? AppColors.brand : AppColors.borderSoft,
               borderRadius: BorderRadius.circular(999),
+              boxShadow: filled
+                  ? [
+                      BoxShadow(
+                        color: AppColors.brand.withValues(alpha: 0.35),
+                        blurRadius: 10,
+                      ),
+                    ]
+                  : null,
             ),
           ),
         );

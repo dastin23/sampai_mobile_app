@@ -150,6 +150,53 @@ void main() {
     expect(later.remainingFlexible, 0);
   });
 
+  test('pemasukan tercatat menambah sisa uang, bukan anggaran (PRD 8.7)', () {
+    final tanpaPemasukan = FinancialSummary.compute(
+      netIncome: 8000000,
+      fixedBillsUnpaid: 2800000,
+      savingsTargetUnfunded: 1000000,
+      safetyBuffer: 0,
+      discretionarySpent: 500000,
+      cycle: cycle,
+      today: DateTime(2026, 10, 8),
+    );
+    final denganPemasukan = FinancialSummary.compute(
+      netIncome: 8000000,
+      fixedBillsUnpaid: 2800000,
+      savingsTargetUnfunded: 1000000,
+      safetyBuffer: 0,
+      discretionarySpent: 500000,
+      cycle: cycle,
+      today: DateTime(2026, 10, 8),
+      recordedIncome: 2000000,
+    );
+
+    // Anggaran fleksibel & Money Velocity tidak berubah.
+    expect(denganPemasukan.discretionaryBudget,
+        tanpaPemasukan.discretionaryBudget);
+    expect(denganPemasukan.remainingFlexible, tanpaPemasukan.remainingFlexible);
+    expect(denganPemasukan.moneyVelocity, tanpaPemasukan.moneyVelocity);
+    // Uang aman dibelanjakan bertambah tepat sebesar pemasukan.
+    expect(denganPemasukan.remainingSpendable,
+        tanpaPemasukan.remainingSpendable + 2000000);
+    // Pemasukan tidak pernah masuk pengeluaran fleksibel.
+    expect(
+      discretionarySpent(
+        [
+          ExpenseTransaction.income(
+            id: 'inc',
+            title: 'Bonus',
+            category: 'Bonus',
+            amount: 2000000,
+            date: DateTime(2026, 10, 8),
+          ),
+        ],
+        cycle,
+      ),
+      0,
+    );
+  });
+
   test('siklus memakai tanggal lokal dengan batas inklusif', () {
     // 25 Sep termasuk hari pertama; 24 Okt hari terakhir.
     expect(cycle.start, DateTime(2026, 9, 25));

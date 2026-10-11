@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/liquid_glass.dart';
 import 'home_controller.dart';
 import 'home_data.dart';
 import 'home_sections.dart';
@@ -44,9 +45,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final controller = widget.controller;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.glassSheet,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => SafeArea(
         child: SingleChildScrollView(
@@ -247,9 +248,20 @@ class _Header extends StatelessWidget {
               onPressed: onPreview,
               tooltip: 'Pratinjau state',
               padding: EdgeInsets.zero,
-              icon: const CircleAvatar(
-                backgroundColor: AppColors.accent,
-                child: Icon(Icons.person_outline, color: AppColors.primary),
+              icon: GlassSurface(
+                kind: GlassKind.raised,
+                radius: 999,
+                color: AppColors.brandSoft.withValues(alpha: 0.75),
+                borderColor: Colors.white.withValues(alpha: 0.8),
+                child: const SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(
+                    Icons.person_outline,
+                    size: 22,
+                    color: AppColors.primaryStrong,
+                  ),
+                ),
               ),
             ),
           ),
@@ -296,6 +308,8 @@ class _ReadyView extends StatelessWidget {
         const SizedBox(height: AppSpacing.section),
         MoneyVelocityCard(summary: data.summary),
         const SizedBox(height: AppSpacing.section),
+        CycleSummarySection(data: data),
+        const SizedBox(height: AppSpacing.section),
         BudgetSummarySection(
           data: data,
           onSeeAll: onSeeAllBudgets,
@@ -330,13 +344,10 @@ class _FirstUseView extends StatelessWidget {
         AppSpacing.section,
       ),
       children: [
-        Container(
-          width: double.infinity,
+        GlassSurface(
+          kind: GlassKind.hero,
+          radius: AppSpacing.heroRadius,
           padding: const EdgeInsets.all(AppSpacing.cardPadding),
-          decoration: BoxDecoration(
-            color: AppColors.accent,
-            borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

@@ -79,6 +79,9 @@ void main() {
     // Data contoh sudah punya transaksi → tidak perlu label estimasi.
     expect(find.text('Estimasi'), findsNothing);
 
+    await scrollHomeTo(tester, 'Ringkasan siklus ini');
+    expect(find.text('Ringkasan siklus ini'), findsOneWidget);
+    expect(find.text('Saldo siklus ini'), findsOneWidget);
     await scrollHomeTo(tester, 'Anggaran siklus ini');
     expect(find.text('Anggaran siklus ini'), findsOneWidget);
     await scrollHomeTo(tester, 'Tagihan terdekat');
@@ -170,7 +173,7 @@ void main() {
     await tester.tap(find.text('Transaksi'));
     await tester.pumpAndSettle();
     expect(find.text('Transaksi'), findsWidgets);
-    expect(find.text('Terpakai siklus ini'), findsOneWidget);
+    expect(find.textContaining('Terpakai siklus ini'), findsWidgets);
     expect(find.text('Warung makan'), findsOneWidget);
   });
 }

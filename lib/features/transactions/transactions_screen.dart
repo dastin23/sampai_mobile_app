@@ -1,24 +1,30 @@
 import 'package:flutter/material.dart';
 
+import '../../core/calc/salary_cycle.dart';
 import '../../core/format/rupiah.dart';
+import '../../core/models/plan.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/liquid_glass.dart';
 import '../home/home_sections.dart';
 import 'transactions_controller.dart';
 import 'transactions_data.dart';
 import 'widgets/transaction_tile.dart';
 
-/// Layar daftar transaksi siklus (tab Transaksi / "Lihat semua", PRD 5.2.F).
+/// Layar daftar transaksi siklus & riwayat lengkap (tab Transaksi / "Lihat
+/// semua", PRD 5.2.F). Mendukung sunting/hapus lewat tap pada baris.
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({
     super.key,
     required this.controller,
     required this.onAddExpense,
     required this.onAddIncome,
+    this.onEditTransaction,
   });
 
   final TransactionsController controller;
   final VoidCallback onAddExpense;
   final VoidCallback onAddIncome;
+  final ValueChanged<ExpenseTransaction>? onEditTransaction;
 
   @override
   State<TransactionsScreen> createState() => _TransactionsScreenState();
@@ -48,6 +54,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         data: controller.data!,
                         today: DateTime.now(),
                         onAddExpense: widget.onAddExpense,
+                        onEditTransaction: widget.onEditTransaction,
+                        onSelectCurrent: controller.selectCurrentCycle,
+                        onSelectCycle: controller.selectCycle,
+                        onSelectAll: controller.selectAll,
                       ),
               },
             ),
@@ -126,11 +136,19 @@ class _TransactionsView extends StatelessWidget {
     required this.data,
     required this.today,
     required this.onAddExpense,
+    required this.onEditTransaction,
+    required this.onSelectCurrent,
+    required this.onSelectCycle,
+    required this.onSelectAll,
   });
 
   final TransactionsData data;
   final DateTime today;
   final VoidCallback onAddExpense;
+  final ValueChanged<ExpenseTransaction>? onEditTransaction;
+  final VoidCallback onSelectCurrent;
+  final ValueChanged<SalaryCycle> onSelectCycle;
+  final VoidCallback onSelectAll;
 
   @override
   Widget build(BuildContext context) {
@@ -144,20 +162,21 @@ class _TransactionsView extends StatelessWidget {
       children: [
         _SummaryCard(data: data),
         const SizedBox(height: AppSpacing.section),
-        const SectionHeader(title: 'Semua transaksi', actionLabel: null),
-        const SizedBox(height: AppSpacing.component),
+        _PeriodFilter(
+          data: data,
+          onSelectCurrent: onSelectCurrent,
+          onSelectCycle: onSelectCycle,
+          onSelectAll: onSelectAll,
+        ),
+        const SizedBox(height: AppSpacing.componentWide),
         if (data.isEmpty)
-          _EmptyCard(onAddExpense: onAddExpense)
+          _EmptyCard(data: data, onAddExpense: onAddExpense)
         else
-          Container(
+          GlassSurface(
+            kind: GlassKind.raised,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.componentWide,
               vertical: AppSpacing.component,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-              border: Border.all(color: AppColors.border),
             ),
             child: Column(
               children: [
@@ -168,6 +187,9 @@ class _TransactionsView extends StatelessWidget {
                     child: TransactionTile(
                       transaction: data.transactions[i],
                       today: today,
+                      onTap: onEditTransaction == null
+                          ? null
+                          : () => onEditTransaction!(data.transactions[i]),
                     ),
                   ),
                 ],
@@ -179,42 +201,47 @@ class _TransactionsView extends StatelessWidget {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.data});
+/// Pemilih periode daftar: siklus berjalan, siklus lain, atau seluruh riwayat
+/// (filter transaksi berdasarkan periode, PRD 7.2).
+class _PeriodFilter extends StatelessWidget {
+  const _PeriodFilter({
+    required this.data,
+    required this.onSelectCurrent,
+    required this.onSelectCycle,
+    required this.onSelectAll,
+  });
 
   final TransactionsData data;
+  final VoidCallback onSelectCurrent;
+  final ValueChanged<SalaryCycle> onSelectCycle;
+  final VoidCallback onSelectAll;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final others = data.availablePeriods
+        .where((cycle) => cycle.start != data.cycle.start)
+        .toList();
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
         children: [
-          const Text('Terpakai siklus ini', style: AppTypography.label),
-          const SizedBox(height: AppSpacing.componentWide),
-          Text(
-            formatRupiah(data.totalSpent),
-            style: AppTypography.display,
+          _PeriodChip(
+            label: 'Siklus ini',
+            selected: !data.isAllScope && data.isCurrentPeriod,
+            onSelected: onSelectCurrent,
           ),
-          const SizedBox(height: AppSpacing.componentWide),
-          Text(
-            'Sisa anggaran fleksibel '
-            '${formatRupiah(data.remainingFlexible)}',
-            style: AppTypography.bodyStrong,
+          const SizedBox(width: AppSpacing.component),
+          _PeriodChip(
+            label: 'Semua transaksi',
+            selected: data.isAllScope,
+            onSelected: onSelectAll,
           ),
-          if (data.totalIncome > 0) ...[
-            const SizedBox(height: AppSpacing.component),
-            Text(
-              'Pemasukan tercatat ${formatRupiah(data.totalIncome)}',
-              style: AppTypography.bodyStrong.copyWith(
-                color: AppColors.successText,
-              ),
+          for (final cycle in others) ...[
+            const SizedBox(width: AppSpacing.component),
+            _PeriodChip(
+              label: cycle.label,
+              selected: !data.isAllScope && data.period?.start == cycle.start,
+              onSelected: () => onSelectCycle(cycle),
             ),
           ],
         ],
@@ -223,24 +250,141 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _EmptyCard extends StatelessWidget {
-  const _EmptyCard({required this.onAddExpense});
+class _PeriodChip extends StatelessWidget {
+  const _PeriodChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
 
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      showCheckmark: false,
+      onSelected: (_) => onSelected(),
+      backgroundColor: AppColors.surface.withValues(alpha: 0.6),
+      selectedColor: AppColors.brandSoft,
+      side: const BorderSide(color: AppColors.borderSoft),
+      labelStyle: AppTypography.bodyStrong.copyWith(
+        color: selected ? AppColors.primaryStrong : AppColors.primary,
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.data});
+
+  final TransactionsData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final scopeLabel = data.periodLabel;
+    return GlassSurface(
+      kind: GlassKind.hero,
+      radius: AppSpacing.heroRadius,
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Saldo $scopeLabel', style: AppTypography.label),
+          const SizedBox(height: AppSpacing.componentWide),
+          Text(
+            formatRupiah(data.balance),
+            style: AppTypography.display.copyWith(
+              color: data.balance < 0 ? AppColors.criticalText : null,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.componentWide),
+          Row(
+            children: [
+              Expanded(
+                child: _SummaryStat(
+                  label: 'Pemasukan',
+                  value: '+${formatRupiah(data.totalIncome)}',
+                  color: AppColors.successText,
+                ),
+              ),
+              Expanded(
+                child: _SummaryStat(
+                  label: 'Pengeluaran',
+                  value: '−${formatRupiah(data.totalExpense)}',
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.componentWide),
+          Text(
+            'Terpakai siklus ini ${formatRupiah(data.totalSpent)}',
+            style: AppTypography.bodyStrong,
+          ),
+          const SizedBox(height: AppSpacing.component),
+          Text(
+            'Sisa anggaran fleksibel '
+            '${formatRupiah(data.remainingFlexible)}',
+            style: AppTypography.bodyStrong,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryStat extends StatelessWidget {
+  const _SummaryStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppTypography.label),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: AppTypography.bodyStrong.copyWith(color: color),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyCard extends StatelessWidget {
+  const _EmptyCard({required this.data, required this.onAddExpense});
+
+  final TransactionsData data;
   final VoidCallback onAddExpense;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final label = data.isAllScope
+        ? 'Belum ada transaksi tercatat'
+        : 'Belum ada transaksi di ${data.periodLabel}';
+    return GlassSurface(
+      kind: GlassKind.raised,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: AppColors.border),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Belum ada pengeluaran tercatat', style: AppTypography.body),
+          Text(
+            label,
+            style: AppTypography.body,
+          ),
           const SizedBox(height: AppSpacing.componentWide),
           OutlinedButton.icon(
             onPressed: onAddExpense,

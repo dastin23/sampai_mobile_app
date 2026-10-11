@@ -101,6 +101,10 @@ class AppDataSync {
       buf
         ..write(t.id)
         ..write(':')
+        ..write(t.title)
+        ..write(':')
+        ..write(t.category)
+        ..write(':')
         ..write(t.amount)
         ..write(':')
         ..write(t.date)

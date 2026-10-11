@@ -86,6 +86,13 @@ class BudgetOverview {
 
   bool get isEmpty => usages.isEmpty;
 
+  /// Jumlah kategori yang sudah melewati batas anggaran (PRD 7.2.C).
+  int get overBudgetCount => usages.where((u) => u.isOver).length;
+
+  /// Jumlah kategori yang mendekati batas (belum lewat).
+  int get nearLimitCount =>
+      usages.where((u) => u.isNearLimit).length;
+
   /// Total alokasi seluruh kategori.
   int get totalAllocated => usages.fold(0, (sum, u) => sum + u.limit);
 

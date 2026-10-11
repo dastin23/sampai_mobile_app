@@ -100,6 +100,25 @@ class ExpenseTransaction {
 
   /// True untuk transaksi pemasukan (gaji tambahan, bonus, dll).
   final bool isIncome;
+
+  /// Salin transaksi dengan nilai yang diganti; `id` dan flag (income,
+  /// fleksibel) dipertahankan — dipakai saat menyunting transaksi.
+  ExpenseTransaction copyWith({
+    String? title,
+    String? category,
+    int? amount,
+    DateTime? date,
+  }) {
+    return ExpenseTransaction(
+      id: id,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      amount: amount ?? this.amount,
+      date: date ?? this.date,
+      countsTowardFlexibleBudget: countsTowardFlexibleBudget,
+      isIncome: isIncome,
+    );
+  }
 }
 
 /// Alokasi batas kategori (diubah lewat layar Budget).

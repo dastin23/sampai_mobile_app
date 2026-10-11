@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 
-/// Progress bar standar: tinggi 8 px, radius 999, track Border (PRD 3.4).
+/// Progress bar standar: tinggi 8 px, radius 999, track lembut (DESIGN.md).
 class ProgressBar extends StatelessWidget {
   const ProgressBar({
     super.key,
     required this.value,
-    this.fill = AppColors.primary,
-    this.track = AppColors.border,
+    this.fill = AppColors.brand,
+    this.track = AppColors.borderSoft,
   });
 
   /// 0–1; nilai di luar rentang dipotong ke track penuh.

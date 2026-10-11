@@ -343,6 +343,25 @@ Contoh:
 
 Floating action button `+` untuk Add Expense dapat dipakai jika tidak menutupi konten. Alternatif yang lebih aman: tombol “+ Catat pengeluaran” sebagai tombol yang terlihat jelas di atas bottom navigation.
 
+### F.1 Ringkasan saldo siklus berjalan
+
+Sebelum daftar transaksi, tampilkan kartu “Ringkasan siklus ini” berisi:
+- Saldo siklus ini (pemasukan − pengeluaran; merah bila negatif)
+- Pemasukan tercatat siklus ini
+- Pengeluaran tercatat siklus ini
+
+Angka dihitung dari seluruh transaksi dalam siklus berjalan (bukan hanya yang tampil di “Transaksi terbaru”).
+
+### F.2 Layar Transaksi (daftar lengkap)
+
+Layar penuh dari “Lihat semua” menampilkan:
+- Kartu ringkasan saldo (mengikuti periode terpilih)
+- Pemilih periode: “Siklus ini”, “Semua transaksi”, dan satu chip per siklus lain yang punya transaksi (dari terbaru). Memilih siklus lain memfilter daftar **dan** ringkasan ke siklus tersebut.
+- Daftar transaksi pada periode terpilih (pengeluaran + pemasukan), terbaru di atas.
+- Tombol “Catat pemasukan” dan “Catat pengeluaran”.
+
+Baris “Terpakai siklus ini” dan “Sisa anggaran fleksibel” selalu merujuk siklus berjalan, apa pun periode yang dipilih.
+
 ### G. Bottom navigation
 
 Item:
@@ -537,6 +556,13 @@ Setiap row:
 - Progress bar
 - Status jika mendekati batas
 
+Di atas daftar kategori, tampilkan banner peringatan agregat bila ada kategori yang melewati atau mendekati batas:
+- Ada yang melewati → “Kategori melewati anggaran: N” (warna kritis)
+- Jika tidak ada yang melewati tetapi ada yang mendekati → “Kategori mendekati batas: N” (warna peringatan)
+- Tidak ada keduanya → banner tidak ditampilkan
+
+Ambang “mendekati batas” mengikuti `BudgetUsage.nearLimitThreshold` (default 80%).
+
 Contoh:
 | Kategori | Terpakai | Anggaran | Progress |
 |---|---:|---:|---:|
@@ -707,6 +733,26 @@ Maka:
 Jika tersisa 12 hari, Safe-to-Spend contoh = Rp1.470.000 / 12 = **Rp122.500 per hari**.
 
 Gunakan angka ini bila menampilkan dataset contoh yang sama. Jangan mencampurnya dengan nilai mock yang tidak konsisten.
+
+## 8.7 Pemasukan tercatat (uang tambahan)
+
+Catatan pemasukan (mis. bonus, gaji tambahan, hasil sampingan) adalah uang
+tambahan **di luar** `netIncome` onboarding. Aturannya:
+
+- `recordedIncome`: total pemasukan tercatat pada siklus berjalan.
+- Pemasukan **menambah** uang yang aman dibelanjakan:
+  `remainingSpendable = max(0, discretionaryBudget + recordedIncome − discretionarySpent)`.
+- Safe-to-Spend harian memakai `remainingSpendable`, bukan `remainingFlexible`.
+- Pemasukan **tidak** mengubah `discretionaryBudget`, Money Velocity, maupun
+  pemakaian kategori — indikator tersebut tetap berbasis rencana anggaran.
+- "Sisa anggaran fleksibel" pada layar Budget/Transaksi tetap memakai
+  `remainingFlexible` (tanpa pemasukan); "Sisa uang fleksibel" pada layar Home
+  memakai `remainingSpendable` (dengan pemasukan).
+- Hanya pemasukan yang jatuh di dalam siklus berjalan yang dihitung.
+
+Hindari hitung ganda: pemasukan yang sudah termasuk `netIncome` onboarding
+(gaji pokok utama) tidak boleh dicatat ulang sebagai pemasukan. Catat hanya
+pendapatan di luar gaji bersih utama.
 
 ---
 

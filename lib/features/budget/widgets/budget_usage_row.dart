@@ -28,13 +28,16 @@ class BudgetUsageRow extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.canvas,
+                color: AppColors.brandSoft.withValues(alpha: 0.30),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.borderSoft.withValues(alpha: 0.6),
+                ),
               ),
               child: Icon(
                 categoryIcon(usage.category),
                 size: 20,
-                color: AppColors.primary,
+                color: AppColors.primaryStrong,
               ),
             ),
             const SizedBox(width: 12),

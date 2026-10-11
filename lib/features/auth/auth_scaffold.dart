@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/liquid_glass.dart';
 
 /// Kerangka halaman autentikasi: Kembali + brand SAMPAI, heading, konten
 /// scroll, dan footer CTA (pola serupa OnboardingScaffold, PRD 4.2).
@@ -24,10 +25,11 @@ class AuthScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.canvas,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      body: AtmosphereBackground(
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
               child: Row(
@@ -91,7 +93,8 @@ class AuthScaffold extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -107,14 +110,16 @@ class AuthInfoBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.success,
+        color: AppColors.success.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: AppColors.successText.withValues(alpha: 0.35),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, size: 20, color: AppColors.primary),
+          const Icon(Icons.info_outline, size: 20, color: AppColors.successText),
           const SizedBox(width: 8),
           Expanded(
             child: Text(message, style: AppTypography.bodyStrong),
@@ -137,9 +142,11 @@ class AuthErrorBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.criticalBackground,
+        color: AppColors.criticalBackground.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: AppColors.criticalText.withValues(alpha: 0.35),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

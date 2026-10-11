@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/format/rupiah.dart';
 import '../../core/models/plan.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/liquid_glass.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_scaffold.dart';
 import 'widgets/form_widgets.dart';
@@ -27,13 +28,9 @@ class FixedExpensesScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (bills.isEmpty)
-            Container(
+            GlassSurface(
+              kind: GlassKind.raised,
               padding: const EdgeInsets.all(AppSpacing.cardPadding),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-                border: Border.all(color: AppColors.border),
-              ),
               child: const Column(
                 children: [
                   Icon(Icons.receipt_long_outlined,
@@ -71,9 +68,11 @@ class FixedExpensesScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: AppColors.surface.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(AppSpacing.fieldRadius),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.5),
+              ),
             ),
             child: Row(
               children: [
@@ -143,13 +142,9 @@ class _BillRowState extends State<_BillRow> {
   @override
   Widget build(BuildContext context) {
     final bill = widget.bill;
-    return Container(
+    return GlassSurface(
+      kind: GlassKind.raised,
       padding: const EdgeInsets.all(AppSpacing.componentWide),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: AppColors.border),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -246,7 +241,7 @@ class _BillRowState extends State<_BillRow> {
               Switch(
                 value: bill.active,
                 activeThumbColor: AppColors.surface,
-                activeTrackColor: AppColors.primary,
+                activeTrackColor: AppColors.brand,
                 onChanged: (v) {
                   widget.controller.updateBill(bill.id, active: v);
                   setState(() {});

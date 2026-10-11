@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../core/calc/salary_cycle.dart';
 import '../../core/state/app_state.dart';
 import 'transactions_data.dart';
 
@@ -15,9 +16,20 @@ class TransactionsController extends ChangeNotifier {
 
   TransactionsStatus _status = TransactionsStatus.loading;
   TransactionsData? _data;
+  TransactionScope _scope = TransactionScope.cycle;
+  SalaryCycle? _period;
 
   TransactionsStatus get status => _status;
   TransactionsData? get data => _data;
+
+  /// Cakupan daftar: siklus berjalan (default) atau seluruh riwayat.
+  TransactionScope get scope => _scope;
+
+  /// Periode siklus terpilih saat [scope] == cycle; null = siklus berjalan.
+  SalaryCycle? get period => _period;
+
+  /// Periode yang bisa dipilih (dari data), terbaru lebih dulu.
+  List<SalaryCycle> get availablePeriods => _data?.availablePeriods ?? const [];
 
   /// Belum ada siklus teratur (plan == null).
   bool get noPlan => _appState.plan == null;
@@ -30,6 +42,33 @@ class TransactionsController extends ChangeNotifier {
     resolveLive();
   }
 
+  /// Ganti cakupan daftar (siklus ini ↔ riwayat semua) dan hitung ulang.
+  void setScope(TransactionScope scope) {
+    switch (scope) {
+      case TransactionScope.all:
+        selectAll();
+      case TransactionScope.cycle:
+        selectCurrentCycle();
+    }
+  }
+
+  /// Pilih periode siklus tertentu; [cycle] null = siklus berjalan.
+  void selectCycle(SalaryCycle? cycle) {
+    _scope = TransactionScope.cycle;
+    _period = cycle;
+    resolveLive();
+  }
+
+  /// Tampilkan seluruh riwayat.
+  void selectAll() {
+    _scope = TransactionScope.all;
+    _period = null;
+    resolveLive();
+  }
+
+  /// Tampilkan siklus berjalan.
+  void selectCurrentCycle() => selectCycle(null);
+
   void resolveLive() {
     final plan = _appState.plan;
     _data = plan == null
@@ -37,6 +76,8 @@ class TransactionsController extends ChangeNotifier {
         : TransactionsData.fromState(
             state: _appState,
             today: DateTime.now(),
+            scope: _scope,
+            period: _period,
           );
     _status = TransactionsStatus.ready;
     notifyListeners();

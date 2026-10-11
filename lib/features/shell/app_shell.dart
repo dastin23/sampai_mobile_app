@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/models/plan.dart';
 import '../../core/state/app_state.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/liquid_glass.dart';
 import '../add_expense/add_expense_sheet.dart';
 import '../budget/budget_controller.dart';
 import '../budget/budget_screen.dart';
@@ -72,61 +74,88 @@ class _AppShellState extends State<AppShell> {
       );
   }
 
+  Future<void> _openEditTransaction(ExpenseTransaction transaction) async {
+    final isIncome = transaction.isIncome;
+    final result = await showEditTransactionSheet(
+      context,
+      appState: widget.appState,
+      transaction: transaction,
+    );
+    if (result == null || !mounted) return;
+    final noun = isIncome ? 'Pemasukan' : 'Pengeluaran';
+    final message = switch (result.action) {
+      TransactionSheetAction.deleted => '$noun dihapus',
+      TransactionSheetAction.saved => '$noun diperbarui',
+    };
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.canvas,
-      body: SafeArea(
-        child: switch (_index) {
-          0 => HomeScreen(
-              controller: _homeController,
-              onAddExpense: _openAddExpense,
-              onAddIncome: _openAddIncome,
-              onSeeAllBudgets: () => _goTo(1),
-              onSeeAllTransactions: () => _goTo(2),
-              onRestartOnboarding: widget.onRestartOnboarding,
-            ),
-          1 => BudgetScreen(controller: _budgetController),
-          2 => TransactionsScreen(
-              controller: _transactionsController,
-              onAddExpense: _openAddExpense,
-              onAddIncome: _openAddIncome,
-            ),
-          _ => ProfilScreen(
-              appState: widget.appState,
-              onRestartOnboarding: widget.onRestartOnboarding,
-            ),
-        },
+      body: AtmosphereBackground(
+        child: SafeArea(
+          child: switch (_index) {
+            0 => HomeScreen(
+                controller: _homeController,
+                onAddExpense: _openAddExpense,
+                onAddIncome: _openAddIncome,
+                onSeeAllBudgets: () => _goTo(1),
+                onSeeAllTransactions: () => _goTo(2),
+                onRestartOnboarding: widget.onRestartOnboarding,
+              ),
+            1 => BudgetScreen(controller: _budgetController),
+            2 => TransactionsScreen(
+                controller: _transactionsController,
+                onAddExpense: _openAddExpense,
+                onAddIncome: _openAddIncome,
+                onEditTransaction: _openEditTransaction,
+              ),
+            _ => ProfilScreen(
+                appState: widget.appState,
+                onRestartOnboarding: widget.onRestartOnboarding,
+              ),
+          },
+        ),
       ),
-      bottomNavigationBar: NavigationBar(
-        height: 72,
-        backgroundColor: AppColors.surface,
-        indicatorColor: AppColors.accent,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        selectedIndex: _index,
-        onDestinationSelected: _goTo,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: GlassSurface(
+          kind: GlassKind.chrome,
+          radius: AppSpacing.dockRadius,
+          child: NavigationBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            selectedIndex: _index,
+            onDestinationSelected: _goTo,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home),
+                label: 'Home',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.donut_small_outlined),
+                selectedIcon: Icon(Icons.donut_small),
+                label: 'Budget',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.receipt_long_outlined),
+                selectedIcon: Icon(Icons.receipt_long),
+                label: 'Transaksi',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Profil',
+              ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.donut_small_outlined),
-            selectedIcon: Icon(Icons.donut_small),
-            label: 'Budget',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'Transaksi',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profil',
-          ),
-        ],
+        ),
       ),
     );
   }

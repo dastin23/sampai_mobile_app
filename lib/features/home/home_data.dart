@@ -28,6 +28,8 @@ class HomeData {
     required this.upcomingBills,
     required this.offline,
     required this.updatedAt,
+    this.cycleIncome = 0,
+    this.cycleExpense = 0,
     this.isDemo = false,
   });
 
@@ -69,6 +71,7 @@ class HomeData {
       discretionarySpent: spent,
       cycle: cycle,
       today: today,
+      recordedIncome: totalIncome(transactions, cycle),
       // Data dianggap belum lengkap selama belum ada catatan pengeluaran
       // (PRD 5.2.B — label Estimasi).
       isEstimate: flexibleTransactionsIn(transactions, cycle).isEmpty,
@@ -85,6 +88,11 @@ class HomeData {
 
     final recent = transactionsInCycle(transactions, cycle)
       ..sort((a, b) => b.date.compareTo(a.date));
+
+    final cycleIncome = totalIncome(transactions, cycle);
+    final cycleExpense = recent
+        .where((t) => !t.isIncome)
+        .fold(0, (sum, t) => sum + t.amount);
 
     final bills = <UpcomingBill>[];
     for (final bill in plan.activeBills) {
@@ -106,6 +114,8 @@ class HomeData {
       upcomingBills: bills,
       offline: offline,
       updatedAt: updatedAt,
+      cycleIncome: cycleIncome,
+      cycleExpense: cycleExpense,
       isDemo: isDemo,
     );
   }
@@ -119,6 +129,15 @@ class HomeData {
   final bool offline;
   final DateTime? updatedAt;
   final bool isDemo;
+
+  /// Total pemasukan tercatat pada siklus berjalan.
+  final int cycleIncome;
+
+  /// Total pengeluaran tercatat pada siklus berjalan.
+  final int cycleExpense;
+
+  /// Saldo siklus berjalan: pemasukan − pengeluaran.
+  int get cycleBalance => cycleIncome - cycleExpense;
 
   String get cycleLabel =>
       '${formatCycleDate(cycle.start)} – ${formatCycleDate(cycle.end)}';
@@ -141,6 +160,8 @@ class HomeData {
         upcomingBills: upcomingBills,
         offline: offline ?? this.offline,
         updatedAt: updatedAt ?? this.updatedAt,
+        cycleIncome: cycleIncome,
+        cycleExpense: cycleExpense,
         isDemo: isDemo,
       );
 }

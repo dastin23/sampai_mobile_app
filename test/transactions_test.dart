@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sampai_app/core/models/plan.dart';
 import 'package:sampai_app/core/state/app_state.dart';
 import 'package:sampai_app/core/theme/app_theme.dart';
 import 'package:sampai_app/features/home/home_demo_data.dart';
 import 'package:sampai_app/features/shell/app_shell.dart';
+import 'package:sampai_app/features/transactions/transactions_data.dart';
 
 void main() {
   late AppState state;
@@ -64,12 +66,18 @@ void main() {
     await pumpApp(tester);
     await goToTransactions(tester);
 
-    expect(find.text('Terpakai siklus ini'), findsOneWidget);
-    expect(find.text('Rp250.000'), findsOneWidget);
+    expect(find.text('Saldo siklus ini'), findsOneWidget);
+    expect(find.text('-Rp250.000'), findsOneWidget);
+    expect(find.text('Terpakai siklus ini Rp250.000'), findsOneWidget);
     expect(find.text('Sisa anggaran fleksibel Rp3.950.000'), findsOneWidget);
+    expect(find.text('Pemasukan'), findsOneWidget);
+    expect(find.text('Pengeluaran'), findsOneWidget);
+    expect(find.text('+Rp0'), findsOneWidget);
     expect(find.text('Warung makan'), findsOneWidget);
-    expect(find.text('−Rp250.000'), findsOneWidget);
+    // Kartu ringkasan + baris transaksi.
+    expect(find.text('−Rp250.000'), findsNWidgets(2));
     expect(find.text('Semua transaksi'), findsOneWidget);
+    expect(find.text('Siklus ini'), findsOneWidget);
   });
 
   testWidgets('daftar kosong menampilkan empty state dan CTA', (tester) async {
@@ -77,7 +85,7 @@ void main() {
     await pumpApp(tester);
     await goToTransactions(tester);
 
-    expect(find.text('Belum ada pengeluaran tercatat'), findsOneWidget);
+    expect(find.text('Belum ada transaksi di siklus ini'), findsOneWidget);
     expect(find.text('Catat pengeluaran pertama'), findsOneWidget);
     expect(find.text('Semua transaksi'), findsOneWidget);
   });
@@ -96,10 +104,10 @@ void main() {
     );
 
     expect(find.text('Pengeluaran tersimpan'), findsOneWidget);
-    expect(find.text('Rp75.000'), findsOneWidget);
     expect(find.text('Sisa anggaran fleksibel Rp4.125.000'), findsOneWidget);
+    expect(find.text('Terpakai siklus ini Rp75.000'), findsOneWidget);
     expect(find.text('Jajan kopi'), findsOneWidget);
-    expect(find.text('−Rp75.000'), findsOneWidget);
+    expect(find.text('−Rp75.000'), findsNWidgets(2));
   });
 
   testWidgets('pengeluaran dari Home juga muncul di daftar Transaksi',
@@ -117,7 +125,223 @@ void main() {
     await goToTransactions(tester);
 
     expect(find.text('Teh tarik'), findsOneWidget);
-    expect(find.text('−Rp15.000'), findsOneWidget);
+    expect(find.text('−Rp15.000'), findsNWidgets(2));
     expect(find.text('Sisa anggaran fleksibel Rp4.185.000'), findsOneWidget);
+  });
+
+  testWidgets('menyunting transaksi lewat tap baris', (tester) async {
+    useDesignFrame(tester);
+    state.addTransaction(demoTransactions(DateTime.now())[0]);
+    await pumpApp(tester);
+    await goToTransactions(tester);
+
+    await tester.tap(find.text('Warung makan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ubah pengeluaran'), findsOneWidget);
+    expect(find.text('Rp250.000'), findsOneWidget);
+    expect(find.text('Simpan perubahan'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).at(0), '300000');
+    await tester.pump();
+    await tester.tap(find.text('Simpan perubahan'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pengeluaran diperbarui'), findsOneWidget);
+    expect(find.text('Warung makan'), findsOneWidget);
+    expect(find.text('−Rp300.000'), findsNWidgets(2));
+    expect(find.text('Terpakai siklus ini Rp300.000'), findsOneWidget);
+  });
+
+  testWidgets('menghapus transaksi lewat sheet sunting', (tester) async {
+    useDesignFrame(tester);
+    state.addTransaction(demoTransactions(DateTime.now())[0]);
+    await pumpApp(tester);
+    await goToTransactions(tester);
+
+    await tester.tap(find.text('Warung makan'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Hapus transaksi'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hapus pengeluaran ini?'), findsOneWidget);
+
+    await tester.tap(find.text('Hapus'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pengeluaran dihapus'), findsOneWidget);
+    expect(find.text('Warung makan'), findsNothing);
+    expect(find.text('Belum ada transaksi di siklus ini'), findsOneWidget);
+  });
+
+  testWidgets('toggle Semua transaksi menampilkan riwayat lintas siklus',
+      (tester) async {
+    useDesignFrame(tester);
+    final now = DateTime.now();
+    state
+      ..addTransaction(demoTransactions(now)[0])
+      ..addTransaction(
+        ExpenseTransaction(
+          id: 'old-1',
+          title: 'Belanja lama',
+          category: 'Belanja',
+          amount: 123000,
+          date: DateTime(now.year, now.month, now.day - 40),
+        ),
+      );
+    await pumpApp(tester);
+    await goToTransactions(tester);
+
+    expect(find.text('Belanja lama'), findsNothing);
+    expect(find.text('Warung makan'), findsOneWidget);
+
+    await tester.tap(find.text('Semua transaksi'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Belanja lama'), findsOneWidget);
+    expect(find.text('Saldo semua waktu'), findsOneWidget);
+  });
+
+  testWidgets('filter periode menampilkan siklus lampau', (tester) async {
+    useDesignFrame(tester);
+    final now = DateTime.now();
+    final plan = demoPlan(now);
+    final pastDate = DateTime(now.year, now.month, now.day - 40);
+    final pastCycle = plan.cycleFor(pastDate);
+    state
+      ..addTransaction(demoTransactions(now)[0])
+      ..addTransaction(
+        ExpenseTransaction(
+          id: 'old-1',
+          title: 'Belanja lama',
+          category: 'Belanja',
+          amount: 123000,
+          date: pastDate,
+        ),
+      );
+    await pumpApp(tester);
+    await goToTransactions(tester);
+
+    expect(find.text('Belanja lama'), findsNothing);
+
+    final chip = find.text(pastCycle.label);
+    await tester.ensureVisible(chip);
+    await tester.pumpAndSettle();
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Belanja lama'), findsOneWidget);
+    expect(find.text('Warung makan'), findsNothing);
+    expect(find.text('Saldo ${pastCycle.label}'), findsOneWidget);
+
+    // Kembali ke siklus berjalan.
+    await tester.ensureVisible(find.text('Siklus ini'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Siklus ini'));
+    await tester.pumpAndSettle();
+    expect(find.text('Saldo siklus ini'), findsOneWidget);
+    expect(find.text('Warung makan'), findsOneWidget);
+  });
+
+  test('TransactionsData menghitung saldo dari pemasukan dan pengeluaran', () {
+    final now = DateTime.now();
+    final data = TransactionsData.fromInputs(
+      plan: demoPlan(now),
+      transactions: [
+        ExpenseTransaction.income(
+          id: 'i',
+          title: 'Bonus',
+          category: 'Bonus',
+          amount: 1000000,
+          date: now,
+        ),
+        ExpenseTransaction(
+          id: 'e',
+          title: 'Makan',
+          category: 'Makan',
+          amount: 250000,
+          date: now,
+        ),
+      ],
+      today: now,
+    );
+
+    expect(data.totalIncome, 1000000);
+    expect(data.totalExpense, 250000);
+    expect(data.balance, 750000);
+  });
+
+  test('TransactionsData memfilter per periode siklus', () {
+    final now = DateTime.now();
+    final plan = demoPlan(now);
+    final pastDate = DateTime(now.year, now.month, now.day - 40);
+    final pastCycle = plan.cycleFor(pastDate);
+    final transactions = [
+      ExpenseTransaction(
+        id: 'now-1',
+        title: 'Kini',
+        category: 'Makan',
+        amount: 100000,
+        date: now,
+      ),
+      ExpenseTransaction(
+        id: 'past-1',
+        title: 'Lampau',
+        category: 'Belanja',
+        amount: 200000,
+        date: pastDate,
+      ),
+    ];
+
+    final current = TransactionsData.fromInputs(
+      plan: plan,
+      transactions: transactions,
+      today: now,
+    );
+    expect(current.isAllScope, isFalse);
+    expect(current.isCurrentPeriod, isTrue);
+    expect(current.periodLabel, 'siklus ini');
+    expect(current.transactions.single.title, 'Kini');
+    expect(current.availablePeriods.length, 2);
+
+    final past = TransactionsData.fromInputs(
+      plan: plan,
+      transactions: transactions,
+      today: now,
+      period: pastCycle,
+    );
+    expect(past.isCurrentPeriod, isFalse);
+    expect(past.periodLabel, pastCycle.label);
+    expect(past.transactions.single.title, 'Lampau');
+    expect(past.balance, -200000);
+
+    final all = TransactionsData.fromInputs(
+      plan: plan,
+      transactions: transactions,
+      today: now,
+      scope: TransactionScope.all,
+    );
+    expect(all.isAllScope, isTrue);
+    expect(all.periodLabel, 'semua waktu');
+    expect(all.transactions.length, 2);
+  });
+
+  test('AppState memperbarui dan menghapus transaksi', () {
+    final localState = AppState()..applyPlan(demoPlan(DateTime.now()));
+    addTearDown(localState.dispose);
+    final t = ExpenseTransaction(
+      id: 't1',
+      title: 'A',
+      category: 'Makan',
+      amount: 1000,
+      date: DateTime.now(),
+    );
+    localState.addTransaction(t);
+    localState.updateTransaction(t.copyWith(amount: 5000, title: 'B'));
+    expect(localState.transactions.single.amount, 5000);
+    expect(localState.transactions.single.title, 'B');
+    localState.deleteTransaction('t1');
+    expect(localState.transactions, isEmpty);
   });
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/calc/financial_summary.dart';
 import '../../../core/format/rupiah.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/liquid_glass.dart';
 
 /// Kartu Safe-to-Spend (PRD 5.2.B).
 class SafeToSpendCard extends StatelessWidget {
@@ -15,18 +16,17 @@ class SafeToSpendCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final critical = summary.isCritical;
     final endsToday = summary.cycleEndsToday;
-    final background =
-        critical ? AppColors.criticalBackground : AppColors.accent;
     final valueColor =
         critical ? AppColors.criticalText : AppColors.primary;
 
-    return Container(
-      width: double.infinity,
+    return GlassSurface(
+      kind: GlassKind.hero,
+      radius: AppSpacing.heroRadius,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-      ),
+      color: critical
+          ? AppColors.criticalBackground.withValues(alpha: 0.85)
+          : null,
+      glowColor: critical ? AppColors.danger : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -47,9 +47,11 @@ class SafeToSpendCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: AppColors.surface.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(
+                      color: AppColors.border.withValues(alpha: 0.35),
+                    ),
                   ),
                   child: Text('Estimasi', style: AppTypography.caption),
                 ),
@@ -60,7 +62,7 @@ class SafeToSpendCard extends StatelessWidget {
             critical
                 ? formatRupiah(0)
                 : endsToday
-                    ? formatRupiah(summary.remainingFlexible)
+                    ? formatRupiah(summary.remainingSpendable)
                     : '${formatRupiah(summary.safeToSpendPerDay)}/hari',
             style: AppTypography.display.copyWith(color: valueColor),
           ),
@@ -83,7 +85,10 @@ class SafeToSpendCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: AppSpacing.componentWide),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(
+            height: 1,
+            color: AppColors.border.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: AppSpacing.componentWide),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -92,7 +97,7 @@ class SafeToSpendCard extends StatelessWidget {
                 child: Text('Sisa uang fleksibel', style: AppTypography.body),
               ),
               Text(
-                formatRupiah(summary.remainingFlexible),
+                formatRupiah(summary.remainingSpendable),
                 style: AppTypography.bodyStrong,
               ),
             ],
@@ -146,9 +151,9 @@ Future<void> showCalculationSheet(
 }) {
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: AppColors.surface,
+    backgroundColor: AppColors.glassSheet,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
     builder: (context) => SafeArea(
       child: Padding(
@@ -162,7 +167,7 @@ Future<void> showCalculationSheet(
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.border,
+                  color: AppColors.borderSoft,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -191,14 +196,19 @@ Future<void> showCalculationSheet(
               label: 'Dikurangi safety buffer',
               value: '-${formatRupiah(summary.safetyBuffer)}',
             ),
+            if (summary.recordedIncome > 0)
+              _CalcRow(
+                label: 'Ditambah pemasukan tercatat',
+                value: '+${formatRupiah(summary.recordedIncome)}',
+              ),
             _CalcRow(
               label: 'Dikurangi pengeluaran fleksibel tercatat',
               value: '-${formatRupiah(summary.discretionarySpent)}',
             ),
             const Divider(height: 24),
             _CalcRow(
-              label: 'Sisa anggaran fleksibel',
-              value: formatRupiah(summary.remainingFlexible),
+              label: 'Sisa uang fleksibel',
+              value: formatRupiah(summary.remainingSpendable),
               strong: true,
             ),
             _CalcRow(

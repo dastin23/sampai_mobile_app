@@ -15,6 +15,7 @@ class FinancialSummary {
     required this.remainingDays,
     required this.totalDays,
     required this.isEstimate,
+    this.recordedIncome = 0,
   });
 
   /// Metode dasar MVP: pendapatan bersih (PRD 8.2).
@@ -26,6 +27,7 @@ class FinancialSummary {
     required int discretionarySpent,
     required SalaryCycle cycle,
     required DateTime today,
+    int recordedIncome = 0,
     bool isEstimate = false,
   }) {
     final elapsed = cycle.elapsedDays(today);
@@ -40,6 +42,7 @@ class FinancialSummary {
       remainingDays: cycle.remainingDays(today),
       totalDays: total,
       isEstimate: isEstimate,
+      recordedIncome: recordedIncome,
     );
   }
 
@@ -53,6 +56,11 @@ class FinancialSummary {
   final int totalDays;
   final bool isEstimate;
 
+  /// Pemasukan tercatat pada siklus berjalan (di luar `netIncome`
+  /// onboarding). Menambah uang yang aman dibelanjakan, tetapi tidak
+  /// mengubah anggaran fleksibel/Money Velocity (PRD 8.7).
+  final int recordedIncome;
+
   /// Anggaran fleksibel awal; boleh negatif untuk menandakan defisit
   /// rencana — jangan pernah dijadikan budget tersimpan (PRD 8.2).
   int get discretionaryBudget =>
@@ -63,7 +71,8 @@ class FinancialSummary {
 
   bool get hasPlanDeficit => discretionaryBudget < 0;
 
-  /// Sisa uang fleksibel (PRD 8.3), tidak pernah negatif.
+  /// Sisa anggaran fleksibel (PRD 8.3), tidak pernah negatif.
+  /// Dipakai untuk perbandingan anggaran (Budget/Transaksi).
   int get remainingFlexible {
     final value = availableForCycle -
         reservedUnpaidBills -
@@ -73,9 +82,17 @@ class FinancialSummary {
     return value < 0 ? 0 : value;
   }
 
+  /// Sisa uang yang aman dibelanjakan: sisa anggaran fleksibel ditambah
+  /// pemasukan tercatat siklus ini (PRD 8.7), tidak pernah negatif.
+  /// Dipakai untuk Safe-to-Spend dan "Sisa uang fleksibel" di Home.
+  int get remainingSpendable {
+    final value = discretionaryBudget + recordedIncome - discretionarySpent;
+    return value < 0 ? 0 : value;
+  }
+
   /// Safe-to-Spend per hari. 0 bila siklus berakhir (hindari bagi nol).
   int get safeToSpendPerDay =>
-      remainingDays <= 0 ? 0 : remainingFlexible ~/ remainingDays;
+      remainingDays <= 0 ? 0 : remainingSpendable ~/ remainingDays;
 
   bool get cycleEndsToday => remainingDays <= 0;
 
@@ -99,7 +116,7 @@ class FinancialSummary {
   bool get isSpendingTooFast =>
       moneyVelocity != null && moneyVelocity! > 1;
 
-  bool get isCritical => remainingFlexible <= 0;
+  bool get isCritical => remainingSpendable <= 0;
 
   /// Alasan Money Velocity tidak tersedia, sesuai PRD 8.4.
   String? get velocityUnavailableReason {

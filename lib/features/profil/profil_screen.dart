@@ -6,6 +6,7 @@ import '../../core/format/rupiah.dart';
 import '../../core/models/plan.dart';
 import '../../core/state/app_state.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/liquid_glass.dart';
 import '../auth/providers/auth_providers.dart';
 
 /// Profil — ringkasan rencana finansial, sinkronisasi akun, dan reset
@@ -29,7 +30,7 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: AppColors.glassSheet,
         title: const Text('Keluar akun?'),
         content: const Text(
           'Rencana, anggaran, dan transaksi tetap tersimpan di akunmu. '
@@ -111,14 +112,9 @@ class _PlanCard extends StatelessWidget {
         '${bills.length} tagihan · ${formatRupiah(plan.activeBillsTotal)} / siklus',
       ),
     ];
-    return Container(
-      width: double.infinity,
+    return GlassSurface(
+      kind: GlassKind.raised,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: AppColors.border),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -156,14 +152,9 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
+    return GlassSurface(
+      kind: GlassKind.raised,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: AppColors.border),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -198,7 +189,7 @@ class _RestartCard extends StatelessWidget {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: AppColors.glassSheet,
         title: const Text('Mulai ulang pengaturan?'),
         content: const Text(
           'Rencana, anggaran, dan transaksi akan dihapus dari akun ini '
@@ -221,14 +212,9 @@ class _RestartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
+    return GlassSurface(
+      kind: GlassKind.raised,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: AppColors.border),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

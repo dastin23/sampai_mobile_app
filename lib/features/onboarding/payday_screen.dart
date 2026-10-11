@@ -53,24 +53,24 @@ class PaydayScreen extends StatelessWidget {
                       onTap: () => controller.setPaydayDay(day),
                       borderRadius: BorderRadius.circular(12),
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
+                        duration: AppMotion.fast,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: controller.paydayDay == day
-                              ? AppColors.primary
-                              : AppColors.surface,
+                              ? AppColors.brand
+                              : AppColors.surface.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: controller.paydayDay == day
-                                ? AppColors.primary
-                                : AppColors.border,
+                                ? Colors.white.withValues(alpha: 0.6)
+                                : AppColors.borderSoft,
                           ),
                         ),
                         child: Text(
                           '$day',
                           style: AppTypography.bodyStrong.copyWith(
                             color: controller.paydayDay == day
-                                ? AppColors.surface
+                                ? AppColors.primary
                                 : AppColors.primary,
                           ),
                         ),

@@ -4,6 +4,7 @@ import '../../core/calc/financial_summary.dart';
 import '../../core/format/rupiah.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/category_icons.dart';
+import '../../core/theme/liquid_glass.dart';
 import '../home/home_sections.dart';
 import '../home/widgets/progress_bar.dart';
 import 'budget_controller.dart';
@@ -26,9 +27,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
     final controller = widget.controller;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.glassSheet,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => SafeArea(
         child: SingleChildScrollView(
@@ -258,6 +259,10 @@ class _OverviewView extends StatelessWidget {
       ),
       children: [
         _TotalBudgetCard(overview: overview),
+        if (overview.overBudgetCount > 0 || overview.nearLimitCount > 0) ...[
+          const SizedBox(height: AppSpacing.componentWide),
+          _BudgetWarningBanner(overview: overview),
+        ],
         const SizedBox(height: AppSpacing.section),
         SectionHeader(
           title: 'Kategori',
@@ -265,13 +270,9 @@ class _OverviewView extends StatelessWidget {
           onAction: onEditAll,
         ),
         const SizedBox(height: AppSpacing.component),
-        Container(
+        GlassSurface(
+          kind: GlassKind.raised,
           padding: const EdgeInsets.all(AppSpacing.componentWide),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-            border: Border.all(color: AppColors.border),
-          ),
           child: Column(
             children: [
               for (var i = 0; i < overview.usages.length; i++) ...[
@@ -299,13 +300,10 @@ class _TotalBudgetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = overview.progress;
-    return Container(
-      width: double.infinity,
+    return GlassSurface(
+      kind: GlassKind.hero,
+      radius: AppSpacing.heroRadius,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -336,6 +334,8 @@ class _TotalBudgetCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.componentWide),
           ProgressBar(
             value: (progress ?? 0).clamp(0, 1),
+            fill: AppColors.primaryStrong,
+            track: AppColors.surface.withValues(alpha: 0.55),
           ),
           const SizedBox(height: AppSpacing.component),
           Align(
@@ -343,6 +343,43 @@ class _TotalBudgetCard extends StatelessWidget {
             child: Text(
               progress == null ? '—' : formatPercent(progress),
               style: AppTypography.caption,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Banner ringkasan peringatan anggaran: kategori yang mendekati atau
+/// melewati batas (PRD 7.2.C).
+class _BudgetWarningBanner extends StatelessWidget {
+  const _BudgetWarningBanner({required this.overview});
+
+  final BudgetOverview overview;
+
+  @override
+  Widget build(BuildContext context) {
+    final over = overview.overBudgetCount;
+    final near = overview.nearLimitCount;
+    final isOver = over > 0;
+    final message = isOver
+        ? 'Kategori melewati anggaran: $over'
+        : 'Kategori mendekati batas: $near';
+    final color = isOver ? AppColors.criticalText : AppColors.warning;
+    final icon = isOver ? Icons.error_outline : Icons.speed;
+    return GlassSurface(
+      kind: GlassKind.raised,
+      padding: const EdgeInsets.all(AppSpacing.componentWide),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(width: AppSpacing.component),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTypography.bodyStrong.copyWith(color: color),
             ),
           ),
         ],
@@ -368,14 +405,9 @@ class _EmptyView extends StatelessWidget {
         AppSpacing.section,
       ),
       children: [
-        Container(
-          width: double.infinity,
+        GlassSurface(
+          kind: GlassKind.raised,
           padding: const EdgeInsets.all(AppSpacing.cardPadding),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-            border: Border.all(color: AppColors.border),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

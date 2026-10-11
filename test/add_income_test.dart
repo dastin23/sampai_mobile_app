@@ -142,6 +142,23 @@ void main() {
     expect(find.text('+Rp2.000.000'), findsOneWidget);
   });
 
+  testWidgets('pemasukan menambah sisa uang fleksibel di Home', (tester) async {
+    useDesignFrame(tester);
+    await pumpHome(tester);
+
+    // Sebelum ada pemasukan: sisa uang = anggaran fleksibel murni.
+    expect(find.text('Rp4.200.000'), findsWidgets);
+
+    await openSheet(tester);
+    await fillValid(tester);
+    await tester.tap(find.text('Simpan pemasukan'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    // 4.200.000 + 2.000.000 pemasukan tercatat.
+    expect(find.text('Rp6.200.000'), findsOneWidget);
+  });
+
   testWidgets('pemasukan dari Home muncul di daftar Transaksi dengan total',
       (tester) async {
     useDesignFrame(tester);
@@ -157,8 +174,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Gaji tambahan'), findsOneWidget);
-    expect(find.text('+Rp2.000.000'), findsOneWidget);
-    expect(find.text('Pemasukan tercatat Rp2.000.000'), findsOneWidget);
+    expect(find.text('+Rp2.000.000'), findsNWidgets(2));
+    expect(find.text('Saldo siklus ini'), findsOneWidget);
+    expect(find.text('Rp2.000.000'), findsOneWidget);
   });
 
   testWidgets('gagal simpan menahan sheet dan mempertahankan draft',

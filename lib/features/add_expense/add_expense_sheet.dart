@@ -11,40 +11,65 @@ import 'add_expense_controller.dart';
 /// Jenis transaksi yang dicatat lewat sheet.
 enum TransactionKind { expense, income }
 
+/// Hasil sheet sunting: transaksi diperbarui atau dihapus.
+enum TransactionSheetAction { saved, deleted }
+
+class TransactionSheetResult {
+  const TransactionSheetResult.saved(ExpenseTransaction this.transaction)
+      : action = TransactionSheetAction.saved,
+        transactionId = null;
+
+  const TransactionSheetResult.deleted(String this.transactionId)
+      : action = TransactionSheetAction.deleted,
+        transaction = null;
+
+  final TransactionSheetAction action;
+  final ExpenseTransaction? transaction;
+  final String? transactionId;
+}
+
 /// Label dan pilihan kategori yang bergantung pada jenis transaksi.
 class _SheetCopy {
   const _SheetCopy({
     required this.title,
+    required this.editTitle,
     required this.noteLabel,
     required this.noteHint,
     required this.categoryError,
     required this.actionLabel,
+    required this.editActionLabel,
     required this.categories,
   });
 
   final String title;
+  final String editTitle;
   final String noteLabel;
   final String noteHint;
   final String categoryError;
   final String actionLabel;
+  final String editActionLabel;
   final Map<String, IconData> categories;
 }
 
 _SheetCopy _sheetCopy(TransactionKind kind) => switch (kind) {
       TransactionKind.expense => const _SheetCopy(
         title: 'Catat pengeluaran',
+        editTitle: 'Ubah pengeluaran',
         noteLabel: 'Beli apa? (opsional)',
         noteHint: 'Contoh: makan siang',
         categoryError: 'Pilih kategori pengeluaran.',
         actionLabel: 'Simpan pengeluaran',
+        editActionLabel: 'Simpan perubahan',
         categories: categoryIcons,
       ),
       TransactionKind.income => const _SheetCopy(
         title: 'Catat pemasukan',
+        editTitle: 'Ubah pemasukan',
         noteLabel: 'Dari mana? (opsional)',
         noteHint: 'Contoh: gaji tambahan',
         categoryError: 'Pilih kategori pemasukan.',
         actionLabel: 'Simpan pemasukan',
+        editActionLabel: 'Simpan perubahan',
         categories: incomeCategoryIcons,
       ),
     };
@@ -56,13 +81,14 @@ Future<ExpenseTransaction?> showAddExpenseSheet(
   BuildContext context, {
   required AppState appState,
   AddExpenseController? controller,
-}) {
-  return _showTransactionSheet(
+}) async {
+  final result = await _showTransactionSheet<TransactionSheetResult>(
     context,
     kind: TransactionKind.expense,
     appState: appState,
     controller: controller,
   );
+  return result?.transaction;
 }
 
 /// Buka sheet "Catat pemasukan".
@@ -70,27 +96,50 @@ Future<ExpenseTransaction?> showAddIncomeSheet(
   BuildContext context, {
   required AppState appState,
   AddIncomeController? controller,
-}) {
-  return _showTransactionSheet(
+}) async {
+  final result = await _showTransactionSheet<TransactionSheetResult>(
     context,
     kind: TransactionKind.income,
     appState: appState,
     controller: controller,
   );
+  return result?.transaction;
 }
 
-Future<ExpenseTransaction?> _showTransactionSheet(
+/// Buka sheet "Ubah transaksi" untuk menyunting atau menghapus [transaction].
+///
+/// Return [TransactionSheetResult] berisi aksi & data, atau [null] bila
+/// ditutup tanpa perubahan.
+Future<TransactionSheetResult?> showEditTransactionSheet(
+  BuildContext context, {
+  required AppState appState,
+  required ExpenseTransaction transaction,
+  AddExpenseController? controller,
+}) {
+  return _showTransactionSheet<TransactionSheetResult>(
+    context,
+    kind: transaction.isIncome
+        ? TransactionKind.income
+        : TransactionKind.expense,
+    appState: appState,
+    controller: controller,
+    editing: transaction,
+  );
+}
+
+Future<T?> _showTransactionSheet<T>(
   BuildContext context, {
   required TransactionKind kind,
   required AppState appState,
   AddExpenseController? controller,
+  ExpenseTransaction? editing,
 }) {
-  return showModalBottomSheet<ExpenseTransaction>(
+  return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppColors.surface,
+    backgroundColor: AppColors.glassSheet,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
     builder: (context) => Padding(
       padding: EdgeInsets.only(
@@ -101,6 +150,7 @@ Future<ExpenseTransaction?> _showTransactionSheet(
           kind: kind,
           appState: appState,
           controller: controller,
+          editing: editing,
         ),
       ),
     ),
@@ -112,11 +162,13 @@ class _AddTransactionSheet extends StatefulWidget {
     required this.kind,
     required this.appState,
     this.controller,
+    this.editing,
   });
 
   final TransactionKind kind;
   final AppState appState;
   final AddExpenseController? controller;
+  final ExpenseTransaction? editing;
 
   @override
   State<_AddTransactionSheet> createState() => _AddTransactionSheetState();
@@ -125,8 +177,8 @@ class _AddTransactionSheet extends StatefulWidget {
 class _AddTransactionSheetState extends State<_AddTransactionSheet> {
   late final AddExpenseController _controller;
   late final bool _ownsController;
-  final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _noteController = TextEditingController();
+  late final TextEditingController _amountController;
+  late final TextEditingController _noteController;
 
   String? _category;
   late DateTime _date;
@@ -136,19 +188,35 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
 
   TransactionKind get _kind => widget.kind;
 
+  ExpenseTransaction? get _editing => widget.editing;
+
+  bool get _isEditing => _editing != null;
+
   _SheetCopy get _copy => _sheetCopy(_kind);
 
   @override
   void initState() {
     super.initState();
     _ownsController = widget.controller == null;
-    _controller =
-        widget.controller ??
+    final editing = _editing;
+    _controller = widget.controller ??
         (_kind == TransactionKind.income
-            ? AddIncomeController(widget.appState)
-            : AddExpenseController(widget.appState));
+            ? AddIncomeController(widget.appState, editing: editing)
+            : AddExpenseController(widget.appState, editing: editing));
     _controller.addListener(_onControllerChanged);
-    _date = _normalizedNow();
+
+    _amountController = TextEditingController(
+      text: editing == null ? '' : formatRupiah(editing.amount),
+    );
+    _noteController = TextEditingController(
+      text: editing == null || editing.title == editing.category
+          ? ''
+          : editing.title,
+    );
+    _category = editing?.category;
+    _date = editing == null
+        ? _normalizedNow()
+        : DateTime(editing.date.year, editing.date.month, editing.date.day);
   }
 
   @override
@@ -169,18 +237,33 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
     if (mounted) setState(() {});
   }
 
-  bool get _isDirty =>
-      _amountController.text.isNotEmpty ||
-      _noteController.text.isNotEmpty ||
-      _category != null ||
-      !_date.isAtSameMomentAs(_normalizedNow());
+  bool get _isDirty {
+    final editing = _editing;
+    if (editing != null) {
+      return parseRupiah(_amountController.text) != editing.amount ||
+          _noteController.text.trim() !=
+              (editing.title == editing.category ? '' : editing.title) ||
+          _category != editing.category ||
+          !_date.isAtSameMomentAs(
+            DateTime(editing.date.year, editing.date.month, editing.date.day),
+          );
+    }
+    return _amountController.text.isNotEmpty ||
+        _noteController.text.isNotEmpty ||
+        _category != null ||
+        !_date.isAtSameMomentAs(_normalizedNow());
+  }
 
   Future<bool> _confirmDiscard() async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: Text('Buang ${_kind == TransactionKind.income ? 'pemasukan' : 'pengeluaran'} ini?'),
+        backgroundColor: AppColors.glassSheet,
+        title: Text(
+          _isEditing
+              ? 'Buang perubahan ini?'
+              : 'Buang ${_kind == TransactionKind.income ? 'pemasukan' : 'pengeluaran'} ini?',
+        ),
         content: const Text(
           'Jumlah dan catatan yang belum disimpan akan hilang.',
           style: AppTypography.body,
@@ -208,6 +291,45 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
     }
     final discard = await _confirmDiscard();
     if (discard && mounted) Navigator.pop(context);
+  }
+
+  Future<void> _confirmDelete() async {
+    final isIncome = _editing?.isIncome ?? false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.glassSheet,
+        title: Text(
+          'Hapus ${isIncome ? 'pemasukan' : 'pengeluaran'} ini?',
+        ),
+        content: const Text(
+          'Transaksi akan dihapus dari riwayat.',
+          style: AppTypography.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(0),
+              backgroundColor: AppColors.criticalText,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final id = _editing?.id;
+    _controller.deleteEditing();
+    _saved = true;
+    Navigator.pop(
+      context,
+      TransactionSheetResult.deleted(id ?? ''),
+    );
   }
 
   Future<void> _pickDate() async {
@@ -248,7 +370,7 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
     );
     if (saved != null && mounted) {
       setState(() => _saved = true);
-      Navigator.pop(context, saved);
+      Navigator.pop(context, TransactionSheetResult.saved(saved));
     }
   }
 
@@ -273,7 +395,7 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
+                    color: AppColors.borderSoft,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -282,7 +404,10 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(_copy.title, style: AppTypography.h2),
+                    child: Text(
+                      _isEditing ? _copy.editTitle : _copy.title,
+                      style: AppTypography.h2,
+                    ),
                   ),
                   IconButton(
                     onPressed: _close,
@@ -372,10 +497,12 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
                     vertical: 14,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: AppColors.surface.withValues(alpha: 0.85),
                     borderRadius:
                         BorderRadius.circular(AppSpacing.fieldRadius),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(
+                      color: AppColors.border.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -432,15 +559,29 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: AppColors.surface,
+                              color: AppColors.primary,
                             ),
                           ),
                           SizedBox(width: 12),
                           Text('Menyimpan…'),
                         ],
                       )
-                    : Text(_copy.actionLabel),
+                    : Text(
+                        _isEditing ? _copy.editActionLabel : _copy.actionLabel,
+                      ),
               ),
+              if (_isEditing) ...[
+                const SizedBox(height: AppSpacing.componentWide),
+                TextButton.icon(
+                  onPressed: _controller.isSaving ? null : _confirmDelete,
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  label: const Text('Hapus transaksi'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.criticalText,
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -471,21 +612,23 @@ class _CategoryTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
+            duration: AppMotion.fast,
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: selected ? AppColors.accent : AppColors.canvas,
+              color: selected
+                  ? AppColors.brandSoft.withValues(alpha: 0.9)
+                  : AppColors.surface.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(AppSpacing.fieldRadius),
               border: Border.all(
-                color: selected ? AppColors.primary : AppColors.border,
+                color: selected ? AppColors.primaryStrong : AppColors.borderSoft,
                 width: selected ? 2 : 1,
               ),
             ),
             child: Icon(
               icon,
               size: 26,
-              color: AppColors.primary,
+              color: selected ? AppColors.primaryStrong : AppColors.primary,
             ),
           ),
           const SizedBox(height: 6),

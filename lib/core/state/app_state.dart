@@ -37,6 +37,25 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Perbarui transaksi berdasarkan id. Tidak terjadi apa-apa bila id tidak
+  /// ditemukan (mis. sudah dihapus).
+  void updateTransaction(ExpenseTransaction transaction) {
+    final index = _transactions.indexWhere((t) => t.id == transaction.id);
+    if (index < 0) return;
+    _transactions[index] = transaction;
+    _touch();
+    notifyListeners();
+  }
+
+  /// Hapus satu transaksi. Tidak terjadi apa-apa bila id tidak ditemukan.
+  void deleteTransaction(String id) {
+    final before = _transactions.length;
+    _transactions.removeWhere((t) => t.id == id);
+    if (_transactions.length == before) return;
+    _touch();
+    notifyListeners();
+  }
+
   void replaceBudgets(List<BudgetCategory> budgets) {
     _budgets
       ..clear()

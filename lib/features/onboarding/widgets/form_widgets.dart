@@ -25,8 +25,8 @@ class PrimaryCta extends StatelessWidget {
       onPressed: enabled ? onPressed : null,
       style: loading
           ? FilledButton.styleFrom(
-              disabledBackgroundColor: AppColors.primary,
-              disabledForegroundColor: AppColors.surface,
+              disabledBackgroundColor: AppColors.brand,
+              disabledForegroundColor: AppColors.primary,
             )
           : null,
       child: loading
@@ -37,8 +37,8 @@ class PrimaryCta extends StatelessWidget {
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: AppColors.surface,
+                    strokeWidth: 2,
+                    color: AppColors.primary,
                   ),
                 ),
                 const SizedBox(width: 10),

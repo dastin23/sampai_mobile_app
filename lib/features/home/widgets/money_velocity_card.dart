@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/calc/financial_summary.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/liquid_glass.dart';
 import 'progress_bar.dart';
 
 /// Kartu Money Velocity (PRD 5.2.C).
@@ -16,14 +17,9 @@ class MoneyVelocityCard extends StatelessWidget {
     final reason = summary.velocityUnavailableReason;
     final tooFast = summary.isSpendingTooFast;
 
-    return Container(
-      width: double.infinity,
+    return GlassSurface(
+      kind: GlassKind.raised,
       padding: const EdgeInsets.all(AppSpacing.componentWide),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: AppColors.border),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -94,23 +90,27 @@ class _RatioChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final background = neutral
-        ? AppColors.canvas
+        ? AppColors.surface.withValues(alpha: 0.6)
         : warning
-            ? AppColors.warning
-            : AppColors.success;
+            ? AppColors.warning.withValues(alpha: 0.9)
+            : AppColors.success.withValues(alpha: 0.9);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: warning
+              ? AppColors.warningText.withValues(alpha: 0.4)
+              : AppColors.borderSoft,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (warning) ...[
             const Icon(Icons.warning_amber_rounded,
-                size: 14, color: AppColors.criticalText),
+                size: 14, color: AppColors.warningText),
             const SizedBox(width: 4),
           ],
           Text(label, style: AppTypography.bodyStrong),

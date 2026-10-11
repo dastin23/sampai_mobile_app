@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/format/date.dart';
 import '../../core/format/rupiah.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/liquid_glass.dart';
 import '../budget/widgets/budget_usage_row.dart';
 import '../transactions/widgets/transaction_tile.dart';
 import 'home_data.dart';
@@ -66,13 +67,9 @@ class BudgetSummarySection extends StatelessWidget {
           onAction: onSeeAll,
         ),
         if (usages.isEmpty)
-          Container(
+          GlassSurface(
+            kind: GlassKind.raised,
             padding: const EdgeInsets.all(AppSpacing.cardPadding),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-              border: Border.all(color: AppColors.border),
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -86,12 +83,11 @@ class BudgetSummarySection extends StatelessWidget {
             ),
           )
         else
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.componentWide),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-              border: Border.all(color: AppColors.border),
+          GlassSurface(
+            kind: GlassKind.raised,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.componentWide,
+              vertical: AppSpacing.component,
             ),
             child: Column(
               children: [
@@ -108,6 +104,87 @@ class BudgetSummarySection extends StatelessWidget {
 }
 
 
+/// Ringkasan saldo siklus berjalan: pemasukan, pengeluaran, dan saldo
+/// (PRD 5.2 — ringkasan saldo & transaksi bulan berjalan).
+class CycleSummarySection extends StatelessWidget {
+  const CycleSummarySection({super.key, required this.data});
+
+  final HomeData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SectionHeader(title: 'Ringkasan siklus ini'),
+        GlassSurface(
+          kind: GlassKind.raised,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.componentWide,
+            vertical: AppSpacing.componentWide,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Saldo siklus ini', style: AppTypography.label),
+              const SizedBox(height: 4),
+              Text(
+                formatRupiah(data.cycleBalance),
+                style: AppTypography.h2.copyWith(
+                  color: data.cycleBalance < 0 ? AppColors.criticalText : null,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.componentWide),
+              Row(
+                children: [
+                  Expanded(
+                    child: _CycleStat(
+                      label: 'Pemasukan',
+                      value: '+${formatRupiah(data.cycleIncome)}',
+                      color: AppColors.successText,
+                    ),
+                  ),
+                  Expanded(
+                    child: _CycleStat(
+                      label: 'Pengeluaran',
+                      value: '−${formatRupiah(data.cycleExpense)}',
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CycleStat extends StatelessWidget {
+  const _CycleStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppTypography.label),
+        const SizedBox(height: 2),
+        Text(value, style: AppTypography.bodyStrong.copyWith(color: color)),
+      ],
+    );
+  }
+}
+
 /// Tagihan yang jatuh tempo dalam siklus berjalan (PRD 5.2.E).
 class UpcomingBillsSection extends StatelessWidget {
   const UpcomingBillsSection({super.key, required this.data, required this.today});
@@ -123,28 +200,20 @@ class UpcomingBillsSection extends StatelessWidget {
       children: [
         const SectionHeader(title: 'Tagihan terdekat'),
         if (bills.isEmpty)
-          Container(
+          GlassSurface(
+            kind: GlassKind.raised,
             padding: const EdgeInsets.all(AppSpacing.cardPadding),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-              border: Border.all(color: AppColors.border),
-            ),
             child: const Text(
               'Tidak ada tagihan terdekat.',
               style: AppTypography.body,
             ),
           )
         else
-          Container(
+          GlassSurface(
+            kind: GlassKind.raised,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.componentWide,
               vertical: AppSpacing.component,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-              border: Border.all(color: AppColors.border),
             ),
             child: Column(
               children: [
@@ -209,13 +278,9 @@ class RecentTransactionsSection extends StatelessWidget {
           onAction: onSeeAll,
         ),
         if (transactions.isEmpty)
-          Container(
+          GlassSurface(
+            kind: GlassKind.raised,
             padding: const EdgeInsets.all(AppSpacing.cardPadding),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-              border: Border.all(color: AppColors.border),
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -233,15 +298,11 @@ class RecentTransactionsSection extends StatelessWidget {
             ),
           )
         else
-          Container(
+          GlassSurface(
+            kind: GlassKind.raised,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.componentWide,
               vertical: AppSpacing.component,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-              border: Border.all(color: AppColors.border),
             ),
             child: Column(
               children: [
@@ -310,22 +371,29 @@ class OfflineBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GlassSurface(
+      kind: GlassKind.raised,
+      radius: 12,
+      color: AppColors.warning.withValues(alpha: 0.85),
+      borderColor: AppColors.border.withValues(alpha: 0.35),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.warning,
-        borderRadius: BorderRadius.circular(12),
-      ),
       child: Row(
         children: [
-          const Icon(Icons.cloud_off_outlined, size: 18, color: AppColors.primary),
+          const Icon(
+            Icons.cloud_off_outlined,
+            size: 18,
+            color: AppColors.warningText,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               updatedAt == null
                   ? 'Data terakhir belum pernah diperbarui.'
                   : 'Data terakhir diperbarui ${formatDateTime(updatedAt!)}.',
-              style: AppTypography.caption.copyWith(color: AppColors.primary),
+              style: AppTypography.caption.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

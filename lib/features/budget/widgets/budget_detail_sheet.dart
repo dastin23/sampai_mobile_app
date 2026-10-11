@@ -20,9 +20,9 @@ Future<void> showBudgetDetailSheet(
 }) {
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: AppColors.surface,
+    backgroundColor: AppColors.glassSheet,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
     builder: (context) => SafeArea(
       child: SingleChildScrollView(
@@ -37,7 +37,7 @@ Future<void> showBudgetDetailSheet(
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
+                    color: AppColors.borderSoft,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -49,13 +49,16 @@ Future<void> showBudgetDetailSheet(
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: AppColors.canvas,
+                      color: AppColors.brandSoft.withValues(alpha: 0.30),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.borderSoft.withValues(alpha: 0.6),
+                      ),
                     ),
                     child: Icon(
                       categoryIcon(usage.category),
                       size: 22,
-                      color: AppColors.primary,
+                      color: AppColors.primaryStrong,
                     ),
                   ),
                   const SizedBox(width: 12),
