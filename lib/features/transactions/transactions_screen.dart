@@ -88,6 +88,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => _openEditor('income'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(AppSpacing.buttonHeight),
+                  ),
                   icon: const Icon(Icons.arrow_downward, size: 20),
                   label: const Text('Catat pemasukan'),
                 ),
@@ -96,7 +99,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () => _openEditor('expense'),
-                  icon: const Icon(Icons.add, size: 22),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(AppSpacing.buttonHeight),
+                  ),
+                  icon: const Icon(Icons.add, size: 20),
                   label: const Text('Catat pengeluaran'),
                 ),
               ),

@@ -178,7 +178,9 @@ class _TransactionEditorSheetState
             child: const Text('Batal'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(0)),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(64, 44),
+            ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Buang'),
           ),
@@ -216,7 +218,7 @@ class _TransactionEditorSheetState
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(0),
+              minimumSize: const Size(64, 44),
               backgroundColor: AppColors.criticalText,
             ),
             onPressed: () => Navigator.pop(context, true),

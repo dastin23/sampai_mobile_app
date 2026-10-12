@@ -125,6 +125,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: widget.onAddIncome,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(AppSpacing.buttonHeight),
+                  ),
                   icon: const Icon(Icons.arrow_downward, size: 20),
                   label: const Text('Catat pemasukan'),
                 ),
@@ -133,7 +136,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: widget.onAddExpense,
-                  icon: const Icon(Icons.add, size: 22),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(AppSpacing.buttonHeight),
+                  ),
+                  icon: const Icon(Icons.add, size: 20),
                   label: const Text('Catat pengeluaran'),
                 ),
               ),
