@@ -1,19 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sampai_app/app/state/app_providers.dart';
 import 'package:sampai_app/core/models/plan.dart';
 import 'package:sampai_app/core/state/app_state.dart';
 import 'package:sampai_app/core/theme/app_theme.dart';
 import 'package:sampai_app/features/home/home_demo_data.dart';
 import 'package:sampai_app/features/shell/app_shell.dart';
+import 'package:sampai_app/features/transactions/models/transaction_model.dart';
+import 'package:sampai_app/features/transactions/providers/transaction_providers.dart';
 import 'package:sampai_app/features/transactions/transactions_data.dart';
+
+import 'helpers/fake_transaction_repository.dart';
 
 void main() {
   late AppState state;
+  late FakeTransactionRepository repository;
 
   setUp(() {
     state = AppState()
       ..applyPlan(demoPlan(DateTime.now()))
       ..replaceBudgets(demoBudgets());
+    repository = FakeTransactionRepository();
   });
 
   tearDown(() => state.dispose());
@@ -26,9 +34,15 @@ void main() {
 
   Future<void> pumpApp(WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: AppShell(appState: state, onRestartOnboarding: () {}),
+      ProviderScope(
+        overrides: [
+          appStateProvider.overrideWithValue(state),
+          transactionRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: AppShell(appState: state, onRestartOnboarding: () {}),
+        ),
       ),
     );
     await tester.pump(const Duration(milliseconds: 600));
@@ -55,14 +69,23 @@ void main() {
     await tester.enterText(find.byType(TextField).at(1), note);
     await tester.pump();
     await tester.tap(find.text('Simpan pengeluaran'));
-    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
   }
 
   testWidgets('daftar transaksi menampilkan ringkasan dan baris siklus',
       (tester) async {
     useDesignFrame(tester);
-    state.addTransaction(demoTransactions(DateTime.now())[0]);
+    repository.transactions.add(
+      financeTransaction(
+        id: 'tx-1',
+        type: 'expense',
+        amount: 250000,
+        date: DateTime.now(),
+        categoryId: 'cat-makanan',
+        categoryName: 'Makanan',
+        description: 'Warung makan',
+      ),
+    );
     await pumpApp(tester);
     await goToTransactions(tester);
 
@@ -99,7 +122,7 @@ void main() {
     await saveExpense(
       tester,
       amount: '75000',
-      category: 'Makan',
+      category: 'Makanan',
       note: 'Jajan kopi',
     );
 
@@ -108,30 +131,56 @@ void main() {
     expect(find.text('Terpakai siklus ini Rp75.000'), findsOneWidget);
     expect(find.text('Jajan kopi'), findsOneWidget);
     expect(find.text('−Rp75.000'), findsNWidgets(2));
+    // Tersimpan di repository.
+    expect(repository.transactions.single.amount, 75000);
+    expect(repository.transactions.single.categoryId, 'cat-makanan');
   });
 
-  testWidgets('pengeluaran dari Home juga muncul di daftar Transaksi',
+  testWidgets('saldo dihitung dari pemasukan dan pengeluaran di database',
       (tester) async {
     useDesignFrame(tester);
+    repository.transactions.addAll([
+      financeTransaction(
+        id: 'in-1',
+        type: 'income',
+        amount: 2000000,
+        date: DateTime.now(),
+        categoryId: 'cat-gaji',
+        categoryName: 'Gaji',
+        description: 'Gaji tambahan',
+      ),
+      financeTransaction(
+        id: 'out-1',
+        type: 'expense',
+        amount: 250000,
+        date: DateTime.now(),
+        categoryId: 'cat-makanan',
+        categoryName: 'Makanan',
+        description: 'Warung makan',
+      ),
+    ]);
     await pumpApp(tester);
-
-    await saveExpense(
-      tester,
-      amount: '15000',
-      category: 'Transportasi',
-      note: 'Teh tarik',
-    );
-
     await goToTransactions(tester);
 
-    expect(find.text('Teh tarik'), findsOneWidget);
-    expect(find.text('−Rp15.000'), findsNWidgets(2));
-    expect(find.text('Sisa anggaran fleksibel Rp4.185.000'), findsOneWidget);
+    expect(find.text('Gaji tambahan'), findsOneWidget);
+    expect(find.text('+Rp2.000.000'), findsNWidgets(2));
+    expect(find.text('Saldo siklus ini'), findsOneWidget);
+    expect(find.text('Rp1.750.000'), findsOneWidget);
   });
 
   testWidgets('menyunting transaksi lewat tap baris', (tester) async {
     useDesignFrame(tester);
-    state.addTransaction(demoTransactions(DateTime.now())[0]);
+    repository.transactions.add(
+      financeTransaction(
+        id: 'tx-1',
+        type: 'expense',
+        amount: 250000,
+        date: DateTime.now(),
+        categoryId: 'cat-makanan',
+        categoryName: 'Makanan',
+        description: 'Warung makan',
+      ),
+    );
     await pumpApp(tester);
     await goToTransactions(tester);
 
@@ -145,7 +194,6 @@ void main() {
     await tester.enterText(find.byType(TextField).at(0), '300000');
     await tester.pump();
     await tester.tap(find.text('Simpan perubahan'));
-    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
     expect(find.text('Pengeluaran diperbarui'), findsOneWidget);
@@ -156,7 +204,17 @@ void main() {
 
   testWidgets('menghapus transaksi lewat sheet sunting', (tester) async {
     useDesignFrame(tester);
-    state.addTransaction(demoTransactions(DateTime.now())[0]);
+    repository.transactions.add(
+      financeTransaction(
+        id: 'tx-1',
+        type: 'expense',
+        amount: 250000,
+        date: DateTime.now(),
+        categoryId: 'cat-makanan',
+        categoryName: 'Makanan',
+        description: 'Warung makan',
+      ),
+    );
     await pumpApp(tester);
     await goToTransactions(tester);
 
@@ -179,17 +237,26 @@ void main() {
       (tester) async {
     useDesignFrame(tester);
     final now = DateTime.now();
-    state
-      ..addTransaction(demoTransactions(now)[0])
-      ..addTransaction(
-        ExpenseTransaction(
-          id: 'old-1',
-          title: 'Belanja lama',
-          category: 'Belanja',
-          amount: 123000,
-          date: DateTime(now.year, now.month, now.day - 40),
-        ),
-      );
+    repository.transactions.addAll([
+      financeTransaction(
+        id: 'now-1',
+        type: 'expense',
+        amount: 250000,
+        date: now,
+        categoryId: 'cat-makanan',
+        categoryName: 'Makanan',
+        description: 'Warung makan',
+      ),
+      financeTransaction(
+        id: 'old-1',
+        type: 'expense',
+        amount: 123000,
+        date: DateTime(now.year, now.month, now.day - 40),
+        categoryId: 'cat-belanja',
+        categoryName: 'Belanja',
+        description: 'Belanja lama',
+      ),
+    ]);
     await pumpApp(tester);
     await goToTransactions(tester);
 
@@ -209,17 +276,26 @@ void main() {
     final plan = demoPlan(now);
     final pastDate = DateTime(now.year, now.month, now.day - 40);
     final pastCycle = plan.cycleFor(pastDate);
-    state
-      ..addTransaction(demoTransactions(now)[0])
-      ..addTransaction(
-        ExpenseTransaction(
-          id: 'old-1',
-          title: 'Belanja lama',
-          category: 'Belanja',
-          amount: 123000,
-          date: pastDate,
-        ),
-      );
+    repository.transactions.addAll([
+      financeTransaction(
+        id: 'now-1',
+        type: 'expense',
+        amount: 250000,
+        date: now,
+        categoryId: 'cat-makanan',
+        categoryName: 'Makanan',
+        description: 'Warung makan',
+      ),
+      financeTransaction(
+        id: 'old-1',
+        type: 'expense',
+        amount: 123000,
+        date: pastDate,
+        categoryId: 'cat-belanja',
+        categoryName: 'Belanja',
+        description: 'Belanja lama',
+      ),
+    ]);
     await pumpApp(tester);
     await goToTransactions(tester);
 
@@ -345,3 +421,23 @@ void main() {
     expect(localState.transactions, isEmpty);
   });
 }
+
+FinanceTransaction financeTransaction({
+  required String id,
+  required String type,
+  required double amount,
+  required DateTime date,
+  String? categoryId,
+  String? categoryName,
+  String? description,
+}) =>
+    FinanceTransaction(
+      id: id,
+      userId: 'test-user',
+      type: type,
+      amount: amount,
+      transactionDate: date,
+      categoryId: categoryId,
+      categoryName: categoryName,
+      description: description,
+    );

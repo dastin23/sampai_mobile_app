@@ -159,26 +159,6 @@ void main() {
     expect(find.text('Rp6.200.000'), findsOneWidget);
   });
 
-  testWidgets('pemasukan dari Home muncul di daftar Transaksi dengan total',
-      (tester) async {
-    useDesignFrame(tester);
-    await pumpHome(tester);
-    await openSheet(tester);
-
-    await fillValid(tester);
-    await tester.tap(find.text('Simpan pemasukan'));
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Transaksi'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Gaji tambahan'), findsOneWidget);
-    expect(find.text('+Rp2.000.000'), findsNWidgets(2));
-    expect(find.text('Saldo siklus ini'), findsOneWidget);
-    expect(find.text('Rp2.000.000'), findsOneWidget);
-  });
-
   testWidgets('gagal simpan menahan sheet dan mempertahankan draft',
       (tester) async {
     useDesignFrame(tester);

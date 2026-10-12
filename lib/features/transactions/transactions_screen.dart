@@ -1,98 +1,168 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/state/app_providers.dart';
 import '../../core/calc/salary_cycle.dart';
 import '../../core/format/rupiah.dart';
 import '../../core/models/plan.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/liquid_glass.dart';
 import '../home/home_sections.dart';
-import 'transactions_controller.dart';
+import 'models/transaction_model.dart';
+import 'providers/transaction_providers.dart';
 import 'transactions_data.dart';
+import 'widgets/transaction_editor_sheet.dart';
 import 'widgets/transaction_tile.dart';
 
 /// Layar daftar transaksi siklus & riwayat lengkap (tab Transaksi / "Lihat
-/// semua", PRD 5.2.F). Mendukung sunting/hapus lewat tap pada baris.
-class TransactionsScreen extends StatefulWidget {
-  const TransactionsScreen({
-    super.key,
-    required this.controller,
-    required this.onAddExpense,
-    required this.onAddIncome,
-    this.onEditTransaction,
-  });
-
-  final TransactionsController controller;
-  final VoidCallback onAddExpense;
-  final VoidCallback onAddIncome;
-  final ValueChanged<ExpenseTransaction>? onEditTransaction;
+/// semua", PRD 5.2.F). Sumber data: tabel `transactions` via
+/// [TransactionRepository] (Supabase). Mendukung catat/ubah/hapus.
+class TransactionsScreen extends ConsumerStatefulWidget {
+  const TransactionsScreen({super.key});
 
   @override
-  State<TransactionsScreen> createState() => _TransactionsScreenState();
+  ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
 }
 
-class _TransactionsScreenState extends State<TransactionsScreen> {
+class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
+  TransactionScope _scope = TransactionScope.cycle;
+  SalaryCycle? _period;
+
   @override
   Widget build(BuildContext context) {
-    final controller = widget.controller;
-    return ListenableBuilder(
-      listenable: controller,
-      builder: (context, _) {
-        return Column(
-          children: [
-            _Header(
-              cycleLabel: controller.data?.cycleLabel,
-            ),
-            Expanded(
-              child: switch (controller.status) {
-                TransactionsStatus.loading => const TransactionsSkeleton(),
-                TransactionsStatus.error =>
-                  HomeErrorView(onRetry: controller.load),
-                TransactionsStatus.ready => controller.noPlan ||
-                        controller.data == null
-                    ? _NoPlanView()
-                    : _TransactionsView(
-                        data: controller.data!,
-                        today: DateTime.now(),
-                        onAddExpense: widget.onAddExpense,
-                        onEditTransaction: widget.onEditTransaction,
-                        onSelectCurrent: controller.selectCurrentCycle,
-                        onSelectCycle: controller.selectCycle,
-                        onSelectAll: controller.selectAll,
-                      ),
-              },
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppSpacing.pageHorizontal,
-                AppSpacing.component,
-                AppSpacing.pageHorizontal,
-                AppSpacing.componentWide,
+    final plan = ref.watch(appStateProvider).plan;
+    final transactionsAsync = ref.watch(transactionsProvider);
+
+    final source = transactionsAsync.value ?? const <FinanceTransaction>[];
+    final byId = {for (final t in source) t.id: t};
+    final mapped = source.map(_toExpenseTransaction).toList();
+
+    final data = plan == null
+        ? null
+        : TransactionsData.fromInputs(
+            plan: plan,
+            transactions: mapped,
+            today: DateTime.now(),
+            scope: _scope,
+            period: _period,
+          );
+
+    return Column(
+      children: [
+        _Header(cycleLabel: data?.cycleLabel),
+        Expanded(
+          child: switch (transactionsAsync) {
+            AsyncValue(hasError: true) => HomeErrorView(
+                onRetry: () => ref.invalidate(transactionsProvider),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: widget.onAddIncome,
-                      icon: const Icon(Icons.arrow_downward, size: 20),
-                      label: const Text('Catat pemasukan'),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.component),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: widget.onAddExpense,
-                      icon: const Icon(Icons.add, size: 22),
-                      label: const Text('Catat pengeluaran'),
-                    ),
-                  ),
-                ],
+            AsyncValue(isLoading: true) => const TransactionsSkeleton(),
+            _ when plan == null => _NoPlanView(),
+            _ => _TransactionsView(
+                data: data!,
+                today: DateTime.now(),
+                onAddExpense: () => _openEditor('expense'),
+                onEditTransaction: (transaction) =>
+                    _openEditorFor(byId[transaction.id]),
+                onSelectCurrent: _selectCurrent,
+                onSelectCycle: (cycle) => setState(() {
+                  _scope = TransactionScope.cycle;
+                  _period = cycle;
+                }),
+                onSelectAll: () => setState(() {
+                  _scope = TransactionScope.all;
+                  _period = null;
+                }),
               ),
-            ),
-          ],
-        );
-      },
+          },
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.pageHorizontal,
+            AppSpacing.component,
+            AppSpacing.pageHorizontal,
+            AppSpacing.componentWide,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _openEditor('income'),
+                  icon: const Icon(Icons.arrow_downward, size: 20),
+                  label: const Text('Catat pemasukan'),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.component),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => _openEditor('expense'),
+                  icon: const Icon(Icons.add, size: 22),
+                  label: const Text('Catat pengeluaran'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
+
+  void _selectCurrent() {
+    setState(() {
+      _scope = TransactionScope.cycle;
+      _period = null;
+    });
+  }
+
+  Future<void> _openEditorFor(FinanceTransaction? editing) async {
+    if (editing == null) return;
+    await _openEditor(editing.isIncome ? 'income' : 'expense', editing: editing);
+  }
+
+  Future<void> _openEditor(String type, {FinanceTransaction? editing}) async {
+    final result = await showTransactionEditorSheet(
+      context,
+      type: type,
+      editing: editing,
+    );
+    if (result == null || !mounted) return;
+    final noun = type == 'income' ? 'Pemasukan' : 'Pengeluaran';
+    final message = switch (result) {
+      TransactionEditorResult.deleted => '$noun dihapus',
+      TransactionEditorResult.saved => editing == null
+          ? '$noun tersimpan'
+          : '$noun diperbarui',
+    };
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+/// Petakan transaksi dari backend ke model tampilan [ExpenseTransaction].
+ExpenseTransaction _toExpenseTransaction(FinanceTransaction transaction) {
+  final categoryName = transaction.categoryName?.trim();
+  final category =
+      categoryName == null || categoryName.isEmpty ? 'Lainnya' : categoryName;
+  final description = transaction.description?.trim();
+  final title = description == null || description.isEmpty
+      ? category
+      : description;
+  final amount = transaction.amount.round();
+  return transaction.isIncome
+      ? ExpenseTransaction.income(
+          id: transaction.id,
+          title: title,
+          category: category,
+          amount: amount,
+          date: transaction.transactionDate,
+        )
+      : ExpenseTransaction(
+          id: transaction.id,
+          title: title,
+          category: category,
+          amount: amount,
+          date: transaction.transactionDate,
+        );
 }
 
 class _Header extends StatelessWidget {
@@ -145,7 +215,7 @@ class _TransactionsView extends StatelessWidget {
   final TransactionsData data;
   final DateTime today;
   final VoidCallback onAddExpense;
-  final ValueChanged<ExpenseTransaction>? onEditTransaction;
+  final ValueChanged<ExpenseTransaction> onEditTransaction;
   final VoidCallback onSelectCurrent;
   final ValueChanged<SalaryCycle> onSelectCycle;
   final VoidCallback onSelectAll;
@@ -187,9 +257,7 @@ class _TransactionsView extends StatelessWidget {
                     child: TransactionTile(
                       transaction: data.transactions[i],
                       today: today,
-                      onTap: onEditTransaction == null
-                          ? null
-                          : () => onEditTransaction!(data.transactions[i]),
+                      onTap: () => onEditTransaction(data.transactions[i]),
                     ),
                   ),
                 ],

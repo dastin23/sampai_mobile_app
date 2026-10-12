@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/models/plan.dart';
 import '../../core/state/app_state.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/liquid_glass.dart';
@@ -10,7 +9,6 @@ import '../budget/budget_screen.dart';
 import '../home/home_controller.dart';
 import '../home/home_screen.dart';
 import '../profil/profil_screen.dart';
-import '../transactions/transactions_controller.dart';
 import '../transactions/transactions_screen.dart';
 
 /// Shell navigasi bawah: Home, Budget, Transaksi, Profil (PRD 5.2.G).
@@ -32,21 +30,18 @@ class _AppShellState extends State<AppShell> {
   int _index = 0;
   late final HomeController _homeController;
   late final BudgetController _budgetController;
-  late final TransactionsController _transactionsController;
 
   @override
   void initState() {
     super.initState();
     _homeController = HomeController(widget.appState)..load();
     _budgetController = BudgetController(widget.appState)..load();
-    _transactionsController = TransactionsController(widget.appState)..load();
   }
 
   @override
   void dispose() {
     _homeController.dispose();
     _budgetController.dispose();
-    _transactionsController.dispose();
     super.dispose();
   }
 
@@ -74,24 +69,6 @@ class _AppShellState extends State<AppShell> {
       );
   }
 
-  Future<void> _openEditTransaction(ExpenseTransaction transaction) async {
-    final isIncome = transaction.isIncome;
-    final result = await showEditTransactionSheet(
-      context,
-      appState: widget.appState,
-      transaction: transaction,
-    );
-    if (result == null || !mounted) return;
-    final noun = isIncome ? 'Pemasukan' : 'Pengeluaran';
-    final message = switch (result.action) {
-      TransactionSheetAction.deleted => '$noun dihapus',
-      TransactionSheetAction.saved => '$noun diperbarui',
-    };
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -108,12 +85,7 @@ class _AppShellState extends State<AppShell> {
                 onRestartOnboarding: widget.onRestartOnboarding,
               ),
             1 => BudgetScreen(controller: _budgetController),
-            2 => TransactionsScreen(
-                controller: _transactionsController,
-                onAddExpense: _openAddExpense,
-                onAddIncome: _openAddIncome,
-                onEditTransaction: _openEditTransaction,
-              ),
+            2 => const TransactionsScreen(),
             _ => ProfilScreen(
                 appState: widget.appState,
                 onRestartOnboarding: widget.onRestartOnboarding,

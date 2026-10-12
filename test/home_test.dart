@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sampai_app/app/state/app_providers.dart';
 import 'package:sampai_app/core/state/app_state.dart';
 import 'package:sampai_app/core/theme/app_theme.dart';
 import 'package:sampai_app/features/home/home_demo_data.dart';
 import 'package:sampai_app/features/shell/app_shell.dart';
+import 'package:sampai_app/features/transactions/models/transaction_model.dart';
+import 'package:sampai_app/features/transactions/providers/transaction_providers.dart';
+
+import 'helpers/fake_transaction_repository.dart';
 
 void main() {
   late AppState state;
+  late FakeTransactionRepository repository;
   final today = DateTime.now();
 
   setUp(() {
@@ -16,6 +23,7 @@ void main() {
     for (final tx in demoTransactions(today)) {
       state.addTransaction(tx);
     }
+    repository = FakeTransactionRepository();
   });
 
   tearDown(() => state.dispose());
@@ -28,9 +36,15 @@ void main() {
 
   Future<void> pumpHome(WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: AppShell(appState: state, onRestartOnboarding: () {}),
+      ProviderScope(
+        overrides: [
+          appStateProvider.overrideWithValue(state),
+          transactionRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: AppShell(appState: state, onRestartOnboarding: () {}),
+        ),
       ),
     );
     await tester.pump(const Duration(milliseconds: 600));
@@ -163,6 +177,18 @@ void main() {
 
   testWidgets('bottom navigation berpindah tab', (tester) async {
     useDesignFrame(tester);
+    repository.transactions.add(
+      FinanceTransaction(
+        id: 'tx-1',
+        userId: 'test-user',
+        type: 'expense',
+        amount: 250000,
+        transactionDate: today,
+        categoryId: 'cat-makanan',
+        categoryName: 'Makanan',
+        description: 'Warung makan',
+      ),
+    );
     await pumpHome(tester);
 
     await tester.tap(find.text('Budget'));
