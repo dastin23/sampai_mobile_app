@@ -24,6 +24,7 @@ class HomeScreen extends ConsumerStatefulWidget {
     required this.onSeeAllTransactions,
     required this.onOpenProfile,
     required this.onRestartOnboarding,
+    this.userName,
   });
 
   final VoidCallback onAddExpense;
@@ -32,6 +33,7 @@ class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback onSeeAllTransactions;
   final VoidCallback onOpenProfile;
   final VoidCallback onRestartOnboarding;
+  final String? userName;
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -93,6 +95,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       children: [
         _Header(
           cycleLabel: data?.cycleLabel,
+          userName: widget.userName,
           onOpenProfile: widget.onOpenProfile,
         ),
         Expanded(
@@ -145,14 +148,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _Header extends StatelessWidget {
   const _Header({
     required this.cycleLabel,
+    required this.userName,
     required this.onOpenProfile,
   });
 
   final String? cycleLabel;
+  final String? userName;
   final VoidCallback onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
+    final name = userName?.trim();
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.pageHorizontal,
@@ -166,7 +172,10 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Halo!', style: AppTypography.h2),
+                Text(
+                  name == null || name.isEmpty ? 'Halo!' : 'Halo, $name!',
+                  style: AppTypography.h2,
+                ),
                 Text(
                   cycleLabel == null
                       ? 'Siklus belum diatur'

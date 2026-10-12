@@ -151,8 +151,11 @@ class _ShellPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authRepositoryProvider);
     return AppShell(
       appState: ref.read(appStateProvider),
+      displayName: auth.displayName,
+      userEmail: auth.userEmail,
       onRestartOnboarding: () => ref.read(onboardedProvider.notifier).reset(),
     );
   }

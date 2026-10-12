@@ -104,6 +104,24 @@ void main() {
     expect(find.text('Rencana finansial'), findsOneWidget);
   });
 
+  testWidgets('header menyapa dengan nama pengguna', (tester) async {
+    useDesignFrame(tester);
+    await tester.pumpWidget(
+      wrap(
+        AppShell(
+          appState: state,
+          onRestartOnboarding: () {},
+          displayName: 'Dastin',
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Halo, Dastin!'), findsOneWidget);
+    expect(find.text('Halo!'), findsNothing);
+  });
+
   testWidgets('state kosong mengarahkan ke pengaturan siklus', (tester) async {
     useDesignFrame(tester);
     final emptyState = AppState();

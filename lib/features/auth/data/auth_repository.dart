@@ -30,6 +30,13 @@ abstract interface class AuthRepository {
 
   bool get isAuthenticated;
 
+  /// Nama tampilan pengguna dari metadata akun (`full_name`);
+  /// null bila tidak tersedia atau kosong.
+  String? get displayName;
+
+  /// Email pengguna yang sedang masuk; null bila tidak ada sesi.
+  String? get userEmail;
+
   Stream<AuthState> get authStateChanges;
 
   Future<AuthOutcome> signIn({required String email, required String password});
@@ -61,6 +68,17 @@ class SupabaseAuthRepository implements AuthRepository {
 
   @override
   bool get isAuthenticated => _client.auth.currentSession != null;
+
+  @override
+  String? get displayName {
+    final meta = _client.auth.currentUser?.userMetadata;
+    final name = meta?['full_name'];
+    if (name is String && name.trim().isNotEmpty) return name.trim();
+    return null;
+  }
+
+  @override
+  String? get userEmail => _client.auth.currentUser?.email;
 
   @override
   Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;

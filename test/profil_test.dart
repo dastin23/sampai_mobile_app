@@ -33,6 +33,8 @@ void main() {
   Future<FakeAuthRepository> pumpShell(
     WidgetTester tester, {
     VoidCallback? onRestart,
+    String? displayName,
+    String? userEmail,
   }) async {
     final repo = FakeAuthRepository(authenticated: true);
     await tester.pumpWidget(
@@ -49,6 +51,8 @@ void main() {
           theme: buildAppTheme(),
           home: AppShell(
             appState: state,
+            displayName: displayName,
+            userEmail: userEmail,
             onRestartOnboarding: onRestart ?? () {},
           ),
         ),
@@ -76,10 +80,17 @@ void main() {
   testWidgets('tab Profil menampilkan ringkasan rencana', (tester) async {
     useDesignFrame(tester);
     var restarted = false;
-    await pumpShell(tester, onRestart: () => restarted = true);
+    await pumpShell(
+      tester,
+      onRestart: () => restarted = true,
+      displayName: 'Dastin Pratama',
+      userEmail: 'dastin@email.com',
+    );
     await goToProfil(tester);
 
     expect(find.text('Rencana finansial'), findsOneWidget);
+    expect(find.text('Dastin Pratama'), findsOneWidget);
+    expect(find.text('dastin@email.com'), findsOneWidget);
     expect(find.text('Gaji bersih per siklus'), findsOneWidget);
     expect(find.text('Rp8.000.000 / siklus'), findsOneWidget);
     expect(

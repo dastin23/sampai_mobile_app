@@ -7,9 +7,20 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// dan reset kata sandi, serta mengemisi event auth seperti implementasi
 /// Supabase agar redirect router dapat diuji.
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({this.authenticated = false});
+  FakeAuthRepository({
+    this.authenticated = false,
+    this.displayName,
+    this.userEmail,
+  });
 
   bool authenticated;
+
+  @override
+  String? displayName;
+
+  @override
+  String? userEmail;
+
   AuthOutcome signInResult = const AuthOutcome.success();
   AuthOutcome signUpResult = const AuthOutcome.success();
   AuthOutcome resetPasswordResult = const AuthOutcome.success();

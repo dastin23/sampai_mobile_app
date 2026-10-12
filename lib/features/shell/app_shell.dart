@@ -15,10 +15,18 @@ class AppShell extends StatefulWidget {
     super.key,
     required this.appState,
     required this.onRestartOnboarding,
+    this.displayName,
+    this.userEmail,
   });
 
   final AppState appState;
   final VoidCallback onRestartOnboarding;
+
+  /// Nama tampilan pengguna (null bila tidak tersedia).
+  final String? displayName;
+
+  /// Email pengguna (null bila tidak tersedia).
+  final String? userEmail;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -63,12 +71,15 @@ class _AppShellState extends State<AppShell> {
                 onSeeAllTransactions: () => _goTo(2),
                 onOpenProfile: () => _goTo(3),
                 onRestartOnboarding: widget.onRestartOnboarding,
+                userName: widget.displayName,
               ),
             1 => BudgetScreen(onOpenProfile: () => _goTo(3)),
             2 => const TransactionsScreen(),
             _ => ProfilScreen(
                 appState: widget.appState,
                 onRestartOnboarding: widget.onRestartOnboarding,
+                userName: widget.displayName,
+                userEmail: widget.userEmail,
               ),
           },
         ),

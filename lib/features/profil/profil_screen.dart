@@ -16,10 +16,14 @@ class ProfilScreen extends ConsumerStatefulWidget {
     super.key,
     required this.appState,
     required this.onRestartOnboarding,
+    this.userName,
+    this.userEmail,
   });
 
   final AppState appState;
   final VoidCallback onRestartOnboarding;
+  final String? userName;
+  final String? userEmail;
 
   @override
   ConsumerState<ProfilScreen> createState() => _ProfilScreenState();
@@ -78,7 +82,11 @@ class _ProfilScreenState extends ConsumerState<ProfilScreen> {
             const SizedBox(height: AppSpacing.section),
             if (plan != null) _PlanCard(plan: plan),
             const SizedBox(height: AppSpacing.section),
-            _AccountCard(onLogout: _confirmLogout),
+            _AccountCard(
+              userName: widget.userName,
+              userEmail: widget.userEmail,
+              onLogout: _confirmLogout,
+            ),
             const SizedBox(height: AppSpacing.section),
             _RestartCard(onRestart: widget.onRestartOnboarding),
           ],
@@ -146,12 +154,22 @@ class _PlanCard extends StatelessWidget {
 }
 
 class _AccountCard extends StatelessWidget {
-  const _AccountCard({required this.onLogout});
+  const _AccountCard({
+    required this.onLogout,
+    this.userName,
+    this.userEmail,
+  });
 
   final VoidCallback onLogout;
+  final String? userName;
+  final String? userEmail;
 
   @override
   Widget build(BuildContext context) {
+    final name = userName?.trim();
+    final email = userEmail?.trim();
+    final hasIdentity =
+        (name != null && name.isNotEmpty) || (email != null && email.isNotEmpty);
     return GlassSurface(
       kind: GlassKind.raised,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -160,6 +178,34 @@ class _AccountCard extends StatelessWidget {
         children: [
           const Text('Akun', style: AppTypography.h3),
           const SizedBox(height: AppSpacing.component),
+          if (hasIdentity) ...[
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor:
+                      AppColors.brandSoft.withValues(alpha: 0.75),
+                  child: const Icon(
+                    Icons.person,
+                    color: AppColors.primaryStrong,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.componentWide),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (name != null && name.isNotEmpty)
+                        Text(name, style: AppTypography.bodyStrong),
+                      if (email != null && email.isNotEmpty)
+                        Text(email, style: AppTypography.caption),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.componentWide),
+          ],
           const Text(
             'Rencana, anggaran, dan transaksi tersinkron ke Supabase '
             'menggunakan akunmu.',
