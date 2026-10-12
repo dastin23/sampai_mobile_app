@@ -41,18 +41,17 @@ class OnboardedNotifier extends Notifier<bool> {
     state = true;
   }
 
-  /// Muat rencana, anggaran, dan transaksi dari Supabase untuk mengisi
-  /// Home saat pengguna kembali. Tidak menindih rencana lokal yang ada.
+  /// Muat rencana dari Supabase untuk mengisi Home saat pengguna kembali.
+  /// Tidak menindih rencana lokal yang ada. Anggaran & transaksi dimuat
+  /// terpisah oleh provider masing-masing.
   Future<void> hydrate() async {
     if (!_authed) return;
     if (_state.plan != null) return;
     try {
-      final snapshot = await ref.read(appDataRepositoryProvider).fetchAll();
+      final plan = await ref.read(appDataRepositoryProvider).fetchPlan();
       if (!_authed) return;
-      if (snapshot.plan != null) {
-        _state.applyPlan(snapshot.plan!);
-        _state.replaceBudgets(snapshot.budgets);
-        _state.replaceTransactions(snapshot.transactions);
+      if (plan != null) {
+        _state.applyPlan(plan);
         state = true;
       }
     } catch (error, stack) {

@@ -9,24 +9,24 @@ import 'package:sampai_app/features/sync/providers/app_data_providers.dart';
 import 'helpers/fake_auth_repository.dart';
 
 class FakeAppDataRepository implements AppDataRepository {
-  AppDataSnapshot snapshotToReturn = const AppDataSnapshot();
+  Plan? planToReturn;
   bool failFetch = false;
   bool failSave = false;
-  final List<AppDataSnapshot> saved = [];
+  final List<Plan> saved = [];
   final List<String> log = [];
 
   @override
-  Future<AppDataSnapshot> fetchAll() async {
-    log.add('fetchAll');
+  Future<Plan?> fetchPlan() async {
+    log.add('fetchPlan');
     if (failFetch) throw StateError('Supabase belum diinisialisasi.');
-    return snapshotToReturn;
+    return planToReturn;
   }
 
   @override
-  Future<void> saveAll(AppDataSnapshot snapshot) async {
-    log.add('saveAll');
+  Future<void> savePlan(Plan plan) async {
+    log.add('savePlan');
     if (failSave) throw StateError('Supabase belum diinisialisasi.');
-    saved.add(snapshot);
+    saved.add(plan);
   }
 
   @override
@@ -35,8 +35,8 @@ class FakeAppDataRepository implements AppDataRepository {
   }
 }
 
-Plan buildPlan() => Plan(
-  netIncome: 5000000,
+Plan buildPlan({int netIncome = 5000000}) => Plan(
+  netIncome: netIncome,
   paydayDay: 25,
   nextPayday: DateTime(2026, 10, 25),
   bills: [
@@ -64,8 +64,7 @@ void main() {
   });
 
   group('AppDataSync (write-through)', () {
-    testWidgets('rencana + transaksi tersimpan ke Supabase saat authed',
-        (tester) async {
+    testWidgets('rencana tersimpan ke Supabase saat authed', (tester) async {
       auth.authenticated = true;
       final container = makeContainer();
       addTearDown(container.dispose);
@@ -76,22 +75,10 @@ void main() {
       state.applyPlan(buildPlan());
       await tester.pump();
 
-      state.addTransaction(
-        ExpenseTransaction(
-          id: 'tx-1',
-          title: 'Makan siang',
-          category: 'Makanan',
-          amount: 25000,
-          date: _today(),
-        ),
-      );
-      await tester.pump();
-
-      expect(repo.log, containsAll(['saveAll']));
+      expect(repo.log, contains('savePlan'));
       final latest = repo.saved.last;
-      expect(latest.plan?.netIncome, 5000000);
-      expect(latest.plan?.bills.length, 2);
-      expect(latest.transactions.map((t) => t.id), contains('tx-1'));
+      expect(latest.netIncome, 5000000);
+      expect(latest.bills.length, 2);
     });
 
     testWidgets('tidak menyimpan saat belum login', (tester) async {
@@ -122,19 +109,10 @@ void main() {
       await tester.pump();
       expect(repo.saved.length, firstCount, reason: 'tidak diulang');
 
-      state.addTransaction(
-        ExpenseTransaction(
-          id: 'tx-2',
-          title: 'Bonus',
-          category: 'Polosan',
-          amount: 100000,
-          isIncome: true,
-          date: _today(),
-        ),
-      );
+      state.applyPlan(buildPlan(netIncome: 6000000));
       await tester.pump();
       expect(repo.saved.length, firstCount + 1);
-      expect(repo.saved.last.transactions.map((t) => t.id), contains('tx-2'));
+      expect(repo.saved.last.netIncome, 6000000);
     });
 
     testWidgets('kegagalan penyimpanan tidak dimuntahkan ke UI',
@@ -147,42 +125,20 @@ void main() {
       container.read(appDataSyncProvider);
       container.read(appStateProvider).applyPlan(buildPlan());
       await tester.pump();
+      expect(repo.saved, isEmpty);
 
       repo.failSave = false;
-      container
-          .read(appStateProvider)
-          .addTransaction(
-            ExpenseTransaction(
-              id: 'tx-retry',
-              title: 'Makan',
-              category: 'Makanan',
-              amount: 10000,
-              date: _today(),
-            ),
-          );
+      container.read(appStateProvider).applyPlan(buildPlan(netIncome: 7000000));
       await tester.pump();
       expect(repo.saved, isNotEmpty, reason: 'penyimpanan berikutnya normal');
-      expect(repo.saved.last.transactions.map((t) => t.id), contains('tx-retry'));
+      expect(repo.saved.last.netIncome, 7000000);
     });
   });
 
   group('OnboardedNotifier.hydrate', () {
-    testWidgets('memuat rencana, anggaran, dan transaksi dari Supabase',
-        (tester) async {
+    testWidgets('memuat rencana dari Supabase', (tester) async {
       auth.authenticated = true;
-      repo.snapshotToReturn = AppDataSnapshot(
-        plan: buildPlan(),
-        budgets: const [BudgetCategory(category: 'Makanan', limit: 800000)],
-        transactions: [
-          ExpenseTransaction(
-            id: 'remote-1',
-            title: 'Belanja',
-            category: 'Makanan',
-            amount: 50000,
-            date: _today(),
-          ),
-        ],
-      );
+      repo.planToReturn = buildPlan();
       final container = makeContainer();
       addTearDown(container.dispose);
 
@@ -193,22 +149,21 @@ void main() {
       final state = container.read(appStateProvider);
       expect(notifier.state, isTrue);
       expect(state.plan?.netIncome, 5000000);
-      expect(state.budgets.single.category, 'Makanan');
-      expect(state.transactions.single.id, 'remote-1');
     });
 
     testWidgets('tidak menindih rencana lokal yang sudah ada',
         (tester) async {
       auth.authenticated = true;
+      repo.planToReturn = buildPlan(netIncome: 9000000);
       final container = makeContainer();
       addTearDown(container.dispose);
 
       final state = container.read(appStateProvider);
-      state.applyPlan(buildPlan());
+      state.applyPlan(buildPlan(netIncome: 5000000));
       await tester.pump();
 
       await container.read(onboardedProvider.notifier).hydrate();
-      expect(state.transactions, isEmpty, reason: 'data remote tidak dimuat');
+      expect(state.plan?.netIncome, 5000000, reason: 'rencana lokal dipertahankan');
     });
 
     testWidgets('gagal saat Supabase tidak tersedia tidak melempar',
@@ -246,5 +201,3 @@ void main() {
     });
   });
 }
-
-DateTime _today() => DateTime(2026, 10, 9);

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/format/rupiah.dart';
 import '../../../core/theme/app_theme.dart';
-import '../budget_controller.dart';
 
 /// Bottom sheet "Ubah anggaran" (PRD 7.2.E).
 ///
@@ -11,9 +10,10 @@ import '../budget_controller.dart';
 /// mengonfirmasi; nominal kategori lain tidak pernah diubah diam-diam.
 Future<void> showBudgetEditSheet(
   BuildContext context, {
-  required BudgetController controller,
   required String title,
   required Map<String, int> initialLimits,
+  required Map<String, int> currentLimits,
+  required Future<void> Function(Map<String, int> limits) onSave,
   int? flexibleBudget,
 }) {
   return showModalBottomSheet<void>(
@@ -28,10 +28,11 @@ Future<void> showBudgetEditSheet(
       child: SafeArea(
         child: SingleChildScrollView(
           child: _BudgetEditSheet(
-            controller: controller,
             title: title,
             initialLimits: initialLimits,
+            currentLimits: currentLimits,
             flexibleBudget: flexibleBudget,
+            onSave: onSave,
           ),
         ),
       ),
@@ -41,16 +42,18 @@ Future<void> showBudgetEditSheet(
 
 class _BudgetEditSheet extends StatefulWidget {
   const _BudgetEditSheet({
-    required this.controller,
     required this.title,
     required this.initialLimits,
+    required this.currentLimits,
     required this.flexibleBudget,
+    required this.onSave,
   });
 
-  final BudgetController controller;
   final String title;
   final Map<String, int> initialLimits;
+  final Map<String, int> currentLimits;
   final int? flexibleBudget;
+  final Future<void> Function(Map<String, int> limits) onSave;
 
   @override
   State<_BudgetEditSheet> createState() => _BudgetEditSheetState();
@@ -65,6 +68,7 @@ class _BudgetEditSheetState extends State<_BudgetEditSheet> {
   final Map<String, String> _errors = {};
   bool _showWarning = false;
   int _pendingTotal = 0;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -83,7 +87,8 @@ class _BudgetEditSheetState extends State<_BudgetEditSheet> {
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_saving) return;
     final parsed = <String, int>{};
     final errors = <String, String>{};
     for (final entry in _fields.entries) {
@@ -104,8 +109,7 @@ class _BudgetEditSheetState extends State<_BudgetEditSheet> {
       return;
     }
 
-    final all = <String, int>{...widget.controller.currentLimits}
-      ..addAll(parsed);
+    final all = <String, int>{...widget.currentLimits}..addAll(parsed);
     final total = all.values.fold(0, (sum, value) => sum + value);
     final flexible = widget.flexibleBudget;
     if (!_showWarning && flexible != null && total > flexible) {
@@ -116,8 +120,9 @@ class _BudgetEditSheetState extends State<_BudgetEditSheet> {
       return;
     }
 
-    widget.controller.saveLimits(parsed);
-    Navigator.pop(context);
+    setState(() => _saving = true);
+    await widget.onSave(parsed);
+    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -189,7 +194,7 @@ class _BudgetEditSheetState extends State<_BudgetEditSheet> {
             const SizedBox(height: AppSpacing.componentWide),
           ],
           FilledButton(
-            onPressed: _submit,
+            onPressed: _saving ? null : _submit,
             child: Text(
               _showWarning ? 'Konfirmasi & simpan' : 'Simpan perubahan',
             ),

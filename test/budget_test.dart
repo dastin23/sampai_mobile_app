@@ -1,21 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sampai_app/app/state/app_providers.dart';
 import 'package:sampai_app/core/state/app_state.dart';
 import 'package:sampai_app/core/theme/app_theme.dart';
+import 'package:sampai_app/features/budget/budget_adapters.dart';
+import 'package:sampai_app/features/budget/budget_screen.dart';
+import 'package:sampai_app/features/budget/models/budget_model.dart';
+import 'package:sampai_app/features/budget/providers/budget_providers.dart';
 import 'package:sampai_app/features/home/home_demo_data.dart';
 import 'package:sampai_app/features/shell/app_shell.dart';
+import 'package:sampai_app/features/transactions/models/transaction_model.dart';
+import 'package:sampai_app/features/transactions/providers/transaction_providers.dart';
+
+import 'helpers/demo_seed.dart';
+import 'helpers/fake_budget_repository.dart';
+import 'helpers/fake_transaction_repository.dart';
 
 void main() {
   late AppState state;
+  late FakeTransactionRepository repository;
+  late FakeBudgetRepository budgetRepository;
   final today = DateTime.now();
 
   setUp(() {
-    state = AppState()
-      ..applyPlan(demoPlan(today))
-      ..replaceBudgets(demoBudgets());
-    for (final tx in demoTransactions(today)) {
-      state.addTransaction(tx);
-    }
+    state = AppState()..applyPlan(demoPlan(today));
+    repository = seededTransactionRepository(today);
+    budgetRepository = seededBudgetRepository(today);
   });
 
   tearDown(() => state.dispose());
@@ -26,30 +37,35 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
-  Future<void> pumpBudget(WidgetTester tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: AppShell(appState: state, onRestartOnboarding: () {}),
-      ),
-    );
+  Widget wrap(
+    AppState appState,
+    FakeTransactionRepository txRepo,
+    FakeBudgetRepository budgetRepo,
+  ) =>
+      ProviderScope(
+        overrides: [
+          appStateProvider.overrideWithValue(appState),
+          transactionRepositoryProvider.overrideWithValue(txRepo),
+          budgetRepositoryProvider.overrideWithValue(budgetRepo),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: AppShell(appState: appState, onRestartOnboarding: () {}),
+        ),
+      );
+
+  Future<void> openBudget(WidgetTester tester, Widget app) async {
+    await tester.pumpWidget(app);
     await tester.tap(find.text('Budget'));
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
   }
 
-  Future<void> preview(WidgetTester tester, String option) async {
-    await tester.tap(find.byTooltip('Pratinjau state'));
-    await tester.pumpAndSettle();
-    final target = find.text(option);
-    if (target.evaluate().isNotEmpty) {
-      await tester.ensureVisible(target);
-      await tester.pumpAndSettle();
-    }
-    await tester.tap(target);
-    await tester.pumpAndSettle();
-  }
+  Future<void> pumpBudget(WidgetTester tester) => openBudget(
+        tester,
+        wrap(state, repository, budgetRepository),
+      );
 
   testWidgets('state normal menampilkan total, sisa, dan progress', (tester) async {
     useDesignFrame(tester);
@@ -74,7 +90,10 @@ void main() {
     useDesignFrame(tester);
     await pumpBudget(tester);
 
-    await tester.tap(find.text('Makan'));
+    final makan = find.text('Makan');
+    await tester.ensureVisible(makan);
+    await tester.pumpAndSettle();
+    await tester.tap(makan);
     await tester.pumpAndSettle();
 
     expect(find.text('Anggaran periode'), findsOneWidget);
@@ -91,7 +110,10 @@ void main() {
     useDesignFrame(tester);
     await pumpBudget(tester);
 
-    await tester.tap(find.text('Makan'));
+    final makan = find.text('Makan');
+    await tester.ensureVisible(makan);
+    await tester.pumpAndSettle();
+    await tester.tap(makan);
     await tester.pumpAndSettle();
     final editButton = find.text('Ubah anggaran');
     await tester.ensureVisible(editButton);
@@ -123,7 +145,10 @@ void main() {
     expect(find.text('Simpan perubahan'), findsOneWidget);
 
     // Transportasi 600.000 → 500.000 → total 4.100.000 ≤ 4.200.000.
-    await tester.enterText(find.byType(TextField).at(1), '500000');
+    final transportasi = find.byWidgetPredicate(
+      (widget) => widget is TextField && widget.controller?.text == '600000',
+    );
+    await tester.enterText(transportasi, '500000');
     await tester.pump();
     await tester.tap(find.text('Simpan perubahan'));
     await tester.pumpAndSettle();
@@ -152,8 +177,35 @@ void main() {
 
   testWidgets('state mendekati batas menampilkan label', (tester) async {
     useDesignFrame(tester);
-    await pumpBudget(tester);
-    await preview(tester, 'Mendekati batas (80%)');
+    final month = activeBudgetMonth(demoPlan(today), today);
+    final budgetRepo = FakeBudgetRepository(
+      categories: demoTestCategories,
+      budgets: [
+        Budget(
+          id: 'b1',
+          userId: 'test-user',
+          categoryId: 'cat-makan',
+          month: month,
+          amount: 1200000,
+          categoryName: 'Makan',
+        ),
+      ],
+    );
+    final txRepo = FakeTransactionRepository(
+      categories: demoTestCategories,
+      transactions: [
+        FinanceTransaction(
+          id: 't1',
+          userId: 'test-user',
+          type: 'expense',
+          amount: 1000000,
+          transactionDate: today,
+          categoryId: 'cat-makan',
+          categoryName: 'Makan',
+        ),
+      ],
+    );
+    await openBudget(tester, wrap(state, txRepo, budgetRepo));
 
     expect(find.text('Mendekati batas'), findsOneWidget);
     expect(find.text('Rp1.000.000 dari Rp1.200.000'), findsOneWidget);
@@ -162,29 +214,48 @@ void main() {
 
   testWidgets('state melebihi anggaran menampilkan jumlah kelebihan', (tester) async {
     useDesignFrame(tester);
-    await pumpBudget(tester);
-    await preview(tester, 'Melebihi anggaran');
+    final month = activeBudgetMonth(demoPlan(today), today);
+    final budgetRepo = FakeBudgetRepository(
+      categories: demoTestCategories,
+      budgets: [
+        Budget(
+          id: 'b1',
+          userId: 'test-user',
+          categoryId: 'cat-makan',
+          month: month,
+          amount: 1000000,
+          categoryName: 'Makan',
+        ),
+      ],
+    );
+    final txRepo = FakeTransactionRepository(
+      categories: demoTestCategories,
+      transactions: [
+        FinanceTransaction(
+          id: 't1',
+          userId: 'test-user',
+          type: 'expense',
+          amount: 1100000,
+          transactionDate: today,
+          categoryId: 'cat-makan',
+          categoryName: 'Makan',
+        ),
+      ],
+    );
+    await openBudget(tester, wrap(state, txRepo, budgetRepo));
 
     expect(find.text('Melebihi anggaran Rp100.000'), findsOneWidget);
     expect(find.text('Kategori melewati anggaran: 1'), findsOneWidget);
   });
 
-  testWidgets('state kosong menawarkan atur anggaran', (tester) async {
-    useDesignFrame(tester);
-    await pumpBudget(tester);
-    await preview(tester, 'Kosong (belum ada anggaran)');
-
-    expect(find.text('Belum ada anggaran kategori.'), findsOneWidget);
-    expect(find.text('Atur anggaran'), findsOneWidget);
-  });
-
   testWidgets('state error menyediakan coba lagi', (tester) async {
     useDesignFrame(tester);
-    await pumpBudget(tester);
-    await preview(tester, 'Error');
+    budgetRepository.failGet = true;
+    await openBudget(tester, wrap(state, repository, budgetRepository));
 
     expect(find.text('Data belum bisa dimuat.'), findsOneWidget);
 
+    budgetRepository.failGet = false;
     await tester.tap(find.text('Coba lagi'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
@@ -193,27 +264,24 @@ void main() {
 
   testWidgets('skeleton tampil saat memuat', (tester) async {
     useDesignFrame(tester);
-    await pumpBudget(tester);
-    await preview(tester, 'Memuat (skeleton)');
-
+    await tester.pumpWidget(
+      MaterialApp(theme: buildAppTheme(), home: const BudgetSkeleton()),
+    );
+    expect(find.byType(BudgetSkeleton), findsOneWidget);
     expect(find.text('Anggaran fleksibel'), findsNothing);
-    expect(find.text('Pratinjau: memuat'), findsOneWidget);
   });
 
   testWidgets('membuat alokasi pertama dari state kosong', (tester) async {
     useDesignFrame(tester);
     final emptyState = AppState()..applyPlan(demoPlan(today));
     addTearDown(emptyState.dispose);
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: AppShell(appState: emptyState, onRestartOnboarding: () {}),
-      ),
+    final emptyBudgets = FakeBudgetRepository(categories: demoTestCategories);
+    final emptyTransactions =
+        FakeTransactionRepository(categories: demoTestCategories);
+    await openBudget(
+      tester,
+      wrap(emptyState, emptyTransactions, emptyBudgets),
     );
-    await tester.tap(find.text('Budget'));
-    await tester.pumpAndSettle();
-    await tester.pump(const Duration(milliseconds: 600));
-    await tester.pumpAndSettle();
 
     expect(find.text('Belum ada anggaran kategori.'), findsOneWidget);
 

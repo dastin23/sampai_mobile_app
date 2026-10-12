@@ -24,16 +24,27 @@ class FakeTransactionRepository implements TransactionRepository {
   FakeTransactionRepository({
     List<FinanceTransaction>? transactions,
     List<TransactionCategory>? categories,
+    this.failCreate = false,
+    this.failGet = false,
   })  : transactions = [...?transactions],
         categories = [...(categories ?? defaultTestCategories)];
 
   final List<FinanceTransaction> transactions;
   final List<TransactionCategory> categories;
 
+  /// Bila true, [createTransaction] melempar error (uji kegagalan simpan).
+  bool failCreate;
+
+  /// Bila true, [getTransactions] melempar error (uji state error layar).
+  bool failGet;
+
   int _sequence = 0;
 
   @override
   Future<List<FinanceTransaction>> getTransactions() async {
+    if (failGet) {
+      throw StateError('gagal memuat (uji)');
+    }
     final list = [...transactions]
       ..sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
     return list;
@@ -51,6 +62,9 @@ class FakeTransactionRepository implements TransactionRepository {
     String? categoryId,
     String? description,
   }) async {
+    if (failCreate) {
+      throw StateError('gagal menyimpan (uji)');
+    }
     _sequence++;
     transactions.add(
       FinanceTransaction(

@@ -3,13 +3,11 @@ import 'package:flutter/material.dart';
 import '../../core/state/app_state.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/liquid_glass.dart';
-import '../add_expense/add_expense_sheet.dart';
-import '../budget/budget_controller.dart';
 import '../budget/budget_screen.dart';
-import '../home/home_controller.dart';
 import '../home/home_screen.dart';
 import '../profil/profil_screen.dart';
 import '../transactions/transactions_screen.dart';
+import '../transactions/widgets/transaction_editor_sheet.dart';
 
 /// Shell navigasi bawah: Home, Budget, Transaksi, Profil (PRD 5.2.G).
 class AppShell extends StatefulWidget {
@@ -28,29 +26,12 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
-  late final HomeController _homeController;
-  late final BudgetController _budgetController;
-
-  @override
-  void initState() {
-    super.initState();
-    _homeController = HomeController(widget.appState)..load();
-    _budgetController = BudgetController(widget.appState)..load();
-  }
-
-  @override
-  void dispose() {
-    _homeController.dispose();
-    _budgetController.dispose();
-    super.dispose();
-  }
 
   void _goTo(int index) => setState(() => _index = index);
 
   Future<void> _openAddExpense() async {
-    final saved = await showAddExpenseSheet(context, appState: widget.appState);
-    if (saved == null || !mounted) return;
-    widget.appState.addTransaction(saved);
+    final result = await showTransactionEditorSheet(context, type: 'expense');
+    if (result != TransactionEditorResult.saved || !mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -59,9 +40,8 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _openAddIncome() async {
-    final saved = await showAddIncomeSheet(context, appState: widget.appState);
-    if (saved == null || !mounted) return;
-    widget.appState.addTransaction(saved);
+    final result = await showTransactionEditorSheet(context, type: 'income');
+    if (result != TransactionEditorResult.saved || !mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -77,14 +57,14 @@ class _AppShellState extends State<AppShell> {
         child: SafeArea(
           child: switch (_index) {
             0 => HomeScreen(
-                controller: _homeController,
                 onAddExpense: _openAddExpense,
                 onAddIncome: _openAddIncome,
                 onSeeAllBudgets: () => _goTo(1),
                 onSeeAllTransactions: () => _goTo(2),
+                onOpenProfile: () => _goTo(3),
                 onRestartOnboarding: widget.onRestartOnboarding,
               ),
-            1 => BudgetScreen(controller: _budgetController),
+            1 => BudgetScreen(onOpenProfile: () => _goTo(3)),
             2 => const TransactionsScreen(),
             _ => ProfilScreen(
                 appState: widget.appState,

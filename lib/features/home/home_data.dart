@@ -2,7 +2,6 @@ import '../../core/calc/cycle_transactions.dart';
 import '../../core/calc/financial_summary.dart';
 import '../../core/calc/salary_cycle.dart';
 import '../../core/models/plan.dart';
-import '../../core/state/app_state.dart';
 
 class UpcomingBill {
   const UpcomingBill({
@@ -32,25 +31,6 @@ class HomeData {
     this.cycleExpense = 0,
     this.isDemo = false,
   });
-
-  factory HomeData.fromState({
-    required AppState state,
-    required DateTime today,
-    required bool offline,
-  }) {
-    final plan = state.plan;
-    if (plan == null) {
-      throw StateError('HomeData.fromState butuh plan');
-    }
-    return HomeData.fromInputs(
-      plan: plan,
-      transactions: state.transactions,
-      budgets: state.budgets,
-      today: today,
-      offline: offline,
-      updatedAt: state.lastUpdatedAt,
-    );
-  }
 
   factory HomeData.fromInputs({
     required Plan plan,

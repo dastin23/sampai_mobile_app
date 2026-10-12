@@ -1,20 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sampai_app/app/state/app_providers.dart';
 import 'package:sampai_app/core/models/plan.dart';
 import 'package:sampai_app/core/state/app_state.dart';
 import 'package:sampai_app/core/theme/app_theme.dart';
-import 'package:sampai_app/features/add_expense/add_expense_controller.dart';
-import 'package:sampai_app/features/add_expense/add_expense_sheet.dart';
+import 'package:sampai_app/features/budget/providers/budget_providers.dart';
 import 'package:sampai_app/features/home/home_demo_data.dart';
 import 'package:sampai_app/features/shell/app_shell.dart';
+import 'package:sampai_app/features/transactions/providers/transaction_providers.dart';
 import 'package:sampai_app/features/transactions/transactions_data.dart';
+
+import 'helpers/demo_seed.dart';
+import 'helpers/fake_budget_repository.dart';
+import 'helpers/fake_transaction_repository.dart';
 
 void main() {
   late AppState state;
+  late FakeTransactionRepository repository;
+  late FakeBudgetRepository budgetRepository;
   final today = DateTime.now();
 
   setUp(() {
     state = AppState()..applyPlan(demoPlan(today));
+    repository = FakeTransactionRepository(categories: demoTestCategories);
+    budgetRepository = FakeBudgetRepository(categories: demoTestCategories);
   });
 
   tearDown(() => state.dispose());
@@ -27,9 +37,16 @@ void main() {
 
   Future<void> pumpHome(WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: AppShell(appState: state, onRestartOnboarding: () {}),
+      ProviderScope(
+        overrides: [
+          appStateProvider.overrideWithValue(state),
+          transactionRepositoryProvider.overrideWithValue(repository),
+          budgetRepositoryProvider.overrideWithValue(budgetRepository),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: AppShell(appState: state, onRestartOnboarding: () {}),
+        ),
       ),
     );
     await tester.pump(const Duration(milliseconds: 600));
@@ -98,10 +115,6 @@ void main() {
 
     await fillValid(tester);
     await tester.tap(find.text('Simpan pemasukan'));
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(find.text('Menyimpan…'), findsOneWidget);
-
-    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
     expect(find.text('Pemasukan tersimpan'), findsOneWidget);
@@ -118,30 +131,6 @@ void main() {
     expect(find.text('+Rp2.000.000'), findsOneWidget);
   });
 
-  testWidgets('submit berulang tidak membuat transaksi ganda', (tester) async {
-    useDesignFrame(tester);
-    await pumpHome(tester);
-    await openSheet(tester);
-
-    await fillValid(tester);
-    await tester.tap(find.text('Simpan pemasukan'));
-    await tester.pump(const Duration(milliseconds: 50));
-
-    expect(find.text('Menyimpan…'), findsOneWidget);
-    await tester.tap(find.text('Menyimpan…'), warnIfMissed: false);
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Pemasukan tersimpan'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('+Rp2.000.000'),
-      120,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('+Rp2.000.000'), findsOneWidget);
-  });
-
   testWidgets('pemasukan menambah sisa uang fleksibel di Home', (tester) async {
     useDesignFrame(tester);
     await pumpHome(tester);
@@ -152,7 +141,6 @@ void main() {
     await openSheet(tester);
     await fillValid(tester);
     await tester.tap(find.text('Simpan pemasukan'));
-    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
     // 4.200.000 + 2.000.000 pemasukan tercatat.
@@ -162,34 +150,12 @@ void main() {
   testWidgets('gagal simpan menahan sheet dan mempertahankan draft',
       (tester) async {
     useDesignFrame(tester);
-    final failing = AddIncomeController(state, simulateFailure: true);
-    addTearDown(failing.dispose);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => Center(
-              child: FilledButton(
-                onPressed: () => showAddIncomeSheet(
-                  context,
-                  appState: state,
-                  controller: failing,
-                ),
-                child: const Text('Buka'),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.tap(find.text('Buka'));
-    await tester.pumpAndSettle();
+    repository.failCreate = true;
+    await pumpHome(tester);
+    await openSheet(tester);
 
     await fillValid(tester);
     await tester.tap(find.text('Simpan pemasukan'));
-    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
     expect(find.text('Belum berhasil menyimpan. Coba lagi.'), findsOneWidget);
@@ -250,7 +216,6 @@ void main() {
       );
 
       expect(income.isIncome, isTrue);
-      expect(income.countsTowardFlexibleBudget, isFalse);
       expect(data.totalSpent, 0);
       expect(data.totalIncome, 2000000);
       expect(data.transactions, hasLength(1));

@@ -11,12 +11,24 @@ import 'package:sampai_app/features/auth/presentation/login_screen.dart';
 import 'package:sampai_app/features/auth/presentation/register_screen.dart';
 import 'package:sampai_app/features/auth/presentation/set_new_password_screen.dart';
 import 'package:sampai_app/features/auth/providers/auth_providers.dart';
+import 'package:sampai_app/features/budget/providers/budget_providers.dart';
 import 'package:sampai_app/features/onboarding/onboarding_flow.dart';
 import 'package:sampai_app/features/shell/app_shell.dart';
+import 'package:sampai_app/features/transactions/providers/transaction_providers.dart';
 
 import 'helpers/fake_auth_repository.dart';
+import 'helpers/fake_budget_repository.dart';
+import 'helpers/fake_transaction_repository.dart';
 
 void main() {
+  overridesFor(FakeAuthRepository repo) => [
+        authRepositoryProvider.overrideWithValue(repo),
+        transactionRepositoryProvider.overrideWithValue(
+          FakeTransactionRepository(),
+        ),
+        budgetRepositoryProvider.overrideWithValue(FakeBudgetRepository()),
+      ];
+
   void useDesignFrame(WidgetTester tester) {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
@@ -30,7 +42,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [authRepositoryProvider.overrideWithValue(repo)],
+        overrides: overridesFor(repo),
         child: MaterialApp(theme: buildAppTheme(), home: screen),
       ),
     );
@@ -39,7 +51,7 @@ void main() {
   Future<void> pumpApp(WidgetTester tester, FakeAuthRepository repo) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [authRepositoryProvider.overrideWithValue(repo)],
+        overrides: overridesFor(repo),
         child: const SampaiApp(),
       ),
     );
@@ -377,7 +389,7 @@ void main() {
       useDesignFrame(tester);
       final repo = FakeAuthRepository()..authenticated = false;
       final container = ProviderContainer(
-        overrides: [authRepositoryProvider.overrideWithValue(repo)],
+        overrides: overridesFor(repo),
       );
       addTearDown(container.dispose);
       container.read(onboardedProvider.notifier).complete();
@@ -418,7 +430,7 @@ void main() {
       useDesignFrame(tester);
       final repo = FakeAuthRepository()..authenticated = true;
       final container = ProviderContainer(
-        overrides: [authRepositoryProvider.overrideWithValue(repo)],
+        overrides: overridesFor(repo),
       );
       addTearDown(container.dispose);
       container.read(onboardedProvider.notifier).complete();
@@ -461,7 +473,7 @@ void main() {
       final repo = FakeAuthRepository()..authenticated = true;
 
       final container = ProviderContainer(
-        overrides: [authRepositoryProvider.overrideWithValue(repo)],
+        overrides: overridesFor(repo),
       );
       addTearDown(container.dispose);
       container.read(onboardedProvider.notifier).complete();
@@ -481,7 +493,7 @@ void main() {
       useDesignFrame(tester);
       final repo = FakeAuthRepository()..authenticated = true;
       final container = ProviderContainer(
-        overrides: [authRepositoryProvider.overrideWithValue(repo)],
+        overrides: overridesFor(repo),
       );
       addTearDown(container.dispose);
       container.read(onboardedProvider.notifier).complete();
@@ -495,7 +507,7 @@ void main() {
       useDesignFrame(tester);
       final repo = FakeAuthRepository(authenticated: true);
       final container = ProviderContainer(
-        overrides: [authRepositoryProvider.overrideWithValue(repo)],
+        overrides: overridesFor(repo),
       );
       addTearDown(container.dispose);
       container.read(onboardedProvider.notifier).complete();

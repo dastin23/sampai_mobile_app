@@ -8,6 +8,7 @@ import '../../core/models/plan.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/liquid_glass.dart';
 import '../home/home_sections.dart';
+import 'models/transaction_adapters.dart';
 import 'models/transaction_model.dart';
 import 'providers/transaction_providers.dart';
 import 'transactions_data.dart';
@@ -35,7 +36,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
     final source = transactionsAsync.value ?? const <FinanceTransaction>[];
     final byId = {for (final t in source) t.id: t};
-    final mapped = source.map(_toExpenseTransaction).toList();
+    final mapped = source.map(toExpenseTransaction).toList();
 
     final data = plan == null
         ? null
@@ -139,32 +140,6 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 }
 
 /// Petakan transaksi dari backend ke model tampilan [ExpenseTransaction].
-ExpenseTransaction _toExpenseTransaction(FinanceTransaction transaction) {
-  final categoryName = transaction.categoryName?.trim();
-  final category =
-      categoryName == null || categoryName.isEmpty ? 'Lainnya' : categoryName;
-  final description = transaction.description?.trim();
-  final title = description == null || description.isEmpty
-      ? category
-      : description;
-  final amount = transaction.amount.round();
-  return transaction.isIncome
-      ? ExpenseTransaction.income(
-          id: transaction.id,
-          title: title,
-          category: category,
-          amount: amount,
-          date: transaction.transactionDate,
-        )
-      : ExpenseTransaction(
-          id: transaction.id,
-          title: title,
-          category: category,
-          amount: amount,
-          date: transaction.transactionDate,
-        );
-}
-
 class _Header extends StatelessWidget {
   const _Header({required this.cycleLabel});
 

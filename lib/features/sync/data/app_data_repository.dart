@@ -3,27 +3,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/config/supabase_config.dart';
 import '../../../core/models/plan.dart';
 
-/// Seluruh data aplikasi satu user: rencana gaji, anggaran, dan transaksi.
+/// Penyimpanan rencana finansial (tabel `plans` + `plan_bills`).
 ///
-/// Dipakai untuk menyalakan ulang Home setelah login (hydrate) dan untuk
-/// menyimpan perubahan lewat [AppDataSync].
-class AppDataSnapshot {
-  const AppDataSnapshot({
-    this.plan,
-    this.budgets = const [],
-    this.transactions = const [],
-  });
-
-  final Plan? plan;
-  final List<BudgetCategory> budgets;
-  final List<ExpenseTransaction> transactions;
-}
-
-/// Kontrak penyimpanan data Home ke backend agar dapat diuji tanpa Supabase.
+/// Anggaran dan transaksi punya repository sendiri (`BudgetRepository`,
+/// `TransactionRepository`). `deleteAll` menyapu seluruh data pengguna saat
+/// "Mulai ulang pengaturan".
 abstract interface class AppDataRepository {
-  Future<AppDataSnapshot> fetchAll();
+  Future<Plan?> fetchPlan();
 
-  Future<void> saveAll(AppDataSnapshot snapshot);
+  Future<void> savePlan(Plan plan);
 
   Future<void> deleteAll();
 }
@@ -47,7 +35,7 @@ class SupabaseAppDataRepository implements AppDataRepository {
   }
 
   @override
-  Future<AppDataSnapshot> fetchAll() async {
+  Future<Plan?> fetchPlan() async {
     final uid = _userId;
 
     final planRow = await _client
@@ -55,17 +43,10 @@ class SupabaseAppDataRepository implements AppDataRepository {
         .select()
         .eq('user_id', uid)
         .maybeSingle();
-    if (planRow == null) return const AppDataSnapshot();
+    if (planRow == null) return null;
 
     final bills = await fetchBills(planRow['id'] as String);
-    final budgets = await fetchBudgets(uid);
-    final transactions = await fetchTransactions(uid);
-
-    return AppDataSnapshot(
-      plan: _planFromMap(planRow, bills),
-      budgets: budgets,
-      transactions: transactions,
-    );
+    return _planFromMap(planRow, bills);
   }
 
   Future<List<FixedBill>> fetchBills(String planId) async {
@@ -86,93 +67,31 @@ class SupabaseAppDataRepository implements AppDataRepository {
     ];
   }
 
-  Future<List<BudgetCategory>> fetchBudgets(String uid) async {
-    final rows = await _client
-        .from('budgets')
-        .select()
-        .eq('user_id', uid);
-    return [
-      for (final row in rows)
-        BudgetCategory(
-          category: row['category'] as String,
-          limit: (row['limit_amount'] as num?)?.toInt() ?? 0,
-        ),
-    ];
-  }
-
-  Future<List<ExpenseTransaction>> fetchTransactions(String uid) async {
-    final rows = await _client
-        .from('transactions')
-        .select()
-        .eq('user_id', uid);
-    return [
-      for (final row in rows)
-        ExpenseTransaction(
-          id: row['id'] as String,
-          title: (row['title'] as String?) ?? '',
-          category: (row['category'] as String?) ?? 'Lainnya',
-          amount: (row['amount'] as num?)?.toInt() ?? 0,
-          date: _parseDate(row['date']),
-          countsTowardFlexibleBudget:
-              (row['counts_toward_flexible'] as bool?) ?? true,
-          isIncome: (row['is_income'] as bool?) ?? false,
-        ),
-    ];
-  }
-
   @override
-  Future<void> saveAll(AppDataSnapshot snapshot) async {
+  Future<void> savePlan(Plan plan) async {
     final uid = _userId;
-    final plan = snapshot.plan;
 
-    if (plan != null) {
-      final inserted = await _client.from('plans').upsert({
-        'user_id': uid,
-        'net_income': plan.netIncome,
-        'payday_day': plan.paydayDay,
-        'next_payday': _toDateString(plan.nextPayday),
-        'savings_target': plan.savingsTarget,
-        'safety_buffer': plan.safetyBuffer,
-      }, onConflict: 'user_id').select('id').single();
-      final planId = inserted['id'] as String;
+    final inserted = await _client.from('plans').upsert({
+      'user_id': uid,
+      'net_income': plan.netIncome,
+      'payday_day': plan.paydayDay,
+      'next_payday': _toDateString(plan.nextPayday),
+      'savings_target': plan.savingsTarget,
+      'safety_buffer': plan.safetyBuffer,
+    }, onConflict: 'user_id').select('id').single();
+    final planId = inserted['id'] as String;
 
-      await _client.from('plan_bills').delete().eq('plan_id', planId);
-      if (plan.bills.isNotEmpty) {
-        await _client.from('plan_bills').insert([
-          for (var i = 0; i < plan.bills.length; i++)
-            {
-              'plan_id': planId,
-              'name': plan.bills[i].name,
-              'amount': plan.bills[i].amount,
-              'due_day': plan.bills[i].dueDay,
-              'active': plan.bills[i].active,
-              'sort_order': i,
-            },
-        ]);
-      }
-    }
-
-    await _client.from('budgets').delete().eq('user_id', uid);
-    if (snapshot.budgets.isNotEmpty) {
-      await _client.from('budgets').insert([
-        for (final b in snapshot.budgets)
-          {'user_id': uid, 'category': b.category, 'limit_amount': b.limit},
-      ]);
-    }
-
-    await _client.from('transactions').delete().eq('user_id', uid);
-    if (snapshot.transactions.isNotEmpty) {
-      await _client.from('transactions').insert([
-        for (final t in snapshot.transactions)
+    await _client.from('plan_bills').delete().eq('plan_id', planId);
+    if (plan.bills.isNotEmpty) {
+      await _client.from('plan_bills').insert([
+        for (var i = 0; i < plan.bills.length; i++)
           {
-            'id': t.id,
-            'user_id': uid,
-            'title': t.title,
-            'category': t.category,
-            'amount': t.amount,
-            'date': _toDateString(t.date),
-            'counts_toward_flexible': t.countsTowardFlexibleBudget,
-            'is_income': t.isIncome,
+            'plan_id': planId,
+            'name': plan.bills[i].name,
+            'amount': plan.bills[i].amount,
+            'due_day': plan.bills[i].dueDay,
+            'active': plan.bills[i].active,
+            'sort_order': i,
           },
       ]);
     }
@@ -201,12 +120,6 @@ class SupabaseAppDataRepository implements AppDataRepository {
     savingsTarget: (row['savings_target'] as num?)?.toInt() ?? 0,
     safetyBuffer: (row['safety_buffer'] as num?)?.toInt() ?? 0,
   );
-
-  static DateTime _parseDate(Object? value) {
-    final parsed = DateTime.tryParse(value as String? ?? '');
-    if (parsed == null) return DateTime.now();
-    return DateTime(parsed.year, parsed.month, parsed.day);
-  }
 
   static DateTime? _parseNullableDate(Object? value) {
     final text = value as String?;

@@ -5,23 +5,25 @@ import 'package:sampai_app/app/state/app_providers.dart';
 import 'package:sampai_app/core/models/plan.dart';
 import 'package:sampai_app/core/state/app_state.dart';
 import 'package:sampai_app/core/theme/app_theme.dart';
+import 'package:sampai_app/features/budget/providers/budget_providers.dart';
 import 'package:sampai_app/features/home/home_demo_data.dart';
 import 'package:sampai_app/features/shell/app_shell.dart';
 import 'package:sampai_app/features/transactions/models/transaction_model.dart';
 import 'package:sampai_app/features/transactions/providers/transaction_providers.dart';
 import 'package:sampai_app/features/transactions/transactions_data.dart';
 
+import 'helpers/fake_budget_repository.dart';
 import 'helpers/fake_transaction_repository.dart';
 
 void main() {
   late AppState state;
   late FakeTransactionRepository repository;
+  late FakeBudgetRepository budgetRepository;
 
   setUp(() {
-    state = AppState()
-      ..applyPlan(demoPlan(DateTime.now()))
-      ..replaceBudgets(demoBudgets());
+    state = AppState()..applyPlan(demoPlan(DateTime.now()));
     repository = FakeTransactionRepository();
+    budgetRepository = FakeBudgetRepository();
   });
 
   tearDown(() => state.dispose());
@@ -38,6 +40,7 @@ void main() {
         overrides: [
           appStateProvider.overrideWithValue(state),
           transactionRepositoryProvider.overrideWithValue(repository),
+          budgetRepositoryProvider.overrideWithValue(budgetRepository),
         ],
         child: MaterialApp(
           theme: buildAppTheme(),
@@ -401,24 +404,6 @@ void main() {
     expect(all.isAllScope, isTrue);
     expect(all.periodLabel, 'semua waktu');
     expect(all.transactions.length, 2);
-  });
-
-  test('AppState memperbarui dan menghapus transaksi', () {
-    final localState = AppState()..applyPlan(demoPlan(DateTime.now()));
-    addTearDown(localState.dispose);
-    final t = ExpenseTransaction(
-      id: 't1',
-      title: 'A',
-      category: 'Makan',
-      amount: 1000,
-      date: DateTime.now(),
-    );
-    localState.addTransaction(t);
-    localState.updateTransaction(t.copyWith(amount: 5000, title: 'B'));
-    expect(localState.transactions.single.amount, 5000);
-    expect(localState.transactions.single.title, 'B');
-    localState.deleteTransaction('t1');
-    expect(localState.transactions, isEmpty);
   });
 }
 

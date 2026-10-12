@@ -1,8 +1,7 @@
 import '../../core/models/plan.dart';
-import 'home_data.dart';
 
-/// Dataset contoh mode desain (PRD 5.3 — hanya untuk pratinjau state,
-/// bukan data produksi). Semua angka dihitung ulang oleh formula yang sama.
+/// Dataset contoh (PRD 5.3) — dipakai test untuk seed data deterministik,
+/// bukan data produksi. Semua angka dihitung ulang oleh formula yang sama.
 Plan demoPlan(DateTime today) {
   final anchor = DateTime(today.year, today.month, today.day - 12);
   return Plan(
@@ -60,32 +59,3 @@ List<ExpenseTransaction> demoTransactions(DateTime today) => [
       _tx(today, 10, 'Hadiah ulang tahun', 'Lainnya', 400000),
       _tx(today, 11, 'Keperluan pribadi', 'Lainnya', 330000),
     ];
-
-/// HomeData contoh: pengeluaran lebih cepat dari waktu siklus (velocity > 1).
-HomeData demoWarningHome({required DateTime today, required bool offline}) =>
-    HomeData.fromInputs(
-      plan: demoPlan(today),
-      transactions: demoTransactions(today),
-      budgets: demoBudgets(),
-      today: today,
-      offline: offline,
-      updatedAt: today,
-      isDemo: true,
-    );
-
-/// HomeData contoh: seluruh anggaran fleksibel terpakai → Safe-to-Spend 0.
-HomeData demoCriticalHome({required DateTime today}) {
-  final transactions = [
-    ...demoTransactions(today),
-    _tx(today, 3, 'Pengeluaran besar', 'Lainnya', 1470000),
-  ];
-  return HomeData.fromInputs(
-    plan: demoPlan(today),
-    transactions: transactions,
-    budgets: demoBudgets(),
-    today: today,
-    offline: false,
-    updatedAt: today,
-    isDemo: true,
-  );
-}

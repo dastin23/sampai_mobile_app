@@ -4,26 +4,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sampai_app/app/state/app_providers.dart';
 import 'package:sampai_app/core/state/app_state.dart';
 import 'package:sampai_app/core/theme/app_theme.dart';
+import 'package:sampai_app/features/budget/providers/budget_providers.dart';
 import 'package:sampai_app/features/home/home_demo_data.dart';
 import 'package:sampai_app/features/shell/app_shell.dart';
 import 'package:sampai_app/features/transactions/models/transaction_model.dart';
 import 'package:sampai_app/features/transactions/providers/transaction_providers.dart';
 
+import 'helpers/demo_seed.dart';
+import 'helpers/fake_budget_repository.dart';
 import 'helpers/fake_transaction_repository.dart';
 
 void main() {
   late AppState state;
   late FakeTransactionRepository repository;
+  late FakeBudgetRepository budgetRepository;
   final today = DateTime.now();
 
   setUp(() {
-    state = AppState()
-      ..applyPlan(demoPlan(today))
-      ..replaceBudgets(demoBudgets());
-    for (final tx in demoTransactions(today)) {
-      state.addTransaction(tx);
-    }
-    repository = FakeTransactionRepository();
+    state = AppState()..applyPlan(demoPlan(today));
+    repository = seededTransactionRepository(today);
+    budgetRepository = seededBudgetRepository(today);
   });
 
   tearDown(() => state.dispose());
@@ -34,32 +34,22 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
-  Future<void> pumpHome(WidgetTester tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
+  Widget wrap(Widget child, {AppState? appState}) => ProviderScope(
         overrides: [
-          appStateProvider.overrideWithValue(state),
+          appStateProvider.overrideWithValue(appState ?? state),
           transactionRepositoryProvider.overrideWithValue(repository),
+          budgetRepositoryProvider.overrideWithValue(budgetRepository),
         ],
-        child: MaterialApp(
-          theme: buildAppTheme(),
-          home: AppShell(appState: state, onRestartOnboarding: () {}),
-        ),
-      ),
+        child: MaterialApp(theme: buildAppTheme(), home: child),
+      );
+
+  Future<void> pumpHome(WidgetTester tester, {AppState? appState}) async {
+    final target = appState ?? state;
+    await tester.pumpWidget(
+      wrap(AppShell(appState: target, onRestartOnboarding: () {}),
+          appState: target),
     );
     await tester.pump(const Duration(milliseconds: 600));
-    await tester.pumpAndSettle();
-  }
-
-  Future<void> preview(WidgetTester tester, String option) async {
-    await tester.tap(find.byTooltip('Pratinjau state'));
-    await tester.pumpAndSettle();
-    final target = find.text(option);
-    if (target.evaluate().isNotEmpty) {
-      await tester.ensureVisible(target);
-      await tester.pumpAndSettle();
-    }
-    await tester.tap(target);
     await tester.pumpAndSettle();
   }
 
@@ -104,41 +94,21 @@ void main() {
     expect(find.text('Transaksi terbaru'), findsOneWidget);
   });
 
-  testWidgets('state peringatan menampilkan velocity > 1', (tester) async {
+  testWidgets('tombol avatar membuka tab Profil', (tester) async {
     useDesignFrame(tester);
     await pumpHome(tester);
-    await preview(tester, 'Peringatan (velocity > 1)');
 
-    expect(find.text('Pratinjau: peringatan'), findsOneWidget);
-    expect(find.textContaining('lebih cepat dari rencana'), findsOneWidget);
-    expect(find.textContaining('×'), findsOneWidget);
-  });
+    await tester.tap(find.byTooltip('Buka profil'));
+    await tester.pumpAndSettle();
 
-  testWidgets('state kritis menampilkan Safe-to-Spend 0', (tester) async {
-    useDesignFrame(tester);
-    await pumpHome(tester);
-    await preview(tester, 'Kritis (Safe-to-Spend 0)');
-
-    expect(find.text('Rp0'), findsWidgets);
-    expect(find.text('Anggaran harian sudah terpakai.'), findsOneWidget);
-    await scrollHomeTo(tester, 'Melebihi anggaran Rp900.000');
-    expect(find.text('Melebihi anggaran Rp900.000'), findsOneWidget);
-  });
-
-  testWidgets('state offline menampilkan data terakhir diperbarui',
-      (tester) async {
-    useDesignFrame(tester);
-    await pumpHome(tester);
-    await preview(tester, 'Offline');
-
-    expect(find.textContaining('Data terakhir diperbarui'), findsOneWidget);
-    expect(find.text('Pratinjau: offline'), findsOneWidget);
+    expect(find.text('Rencana finansial'), findsOneWidget);
   });
 
   testWidgets('state kosong mengarahkan ke pengaturan siklus', (tester) async {
     useDesignFrame(tester);
-    await pumpHome(tester);
-    await preview(tester, 'First-use / kosong');
+    final emptyState = AppState();
+    addTearDown(emptyState.dispose);
+    await pumpHome(tester, appState: emptyState);
 
     expect(
       find.text('Atur siklus gajimu untuk mulai menghitung.'),
@@ -149,11 +119,12 @@ void main() {
 
   testWidgets('state error menyediakan coba lagi', (tester) async {
     useDesignFrame(tester);
+    repository.failGet = true;
     await pumpHome(tester);
-    await preview(tester, 'Error');
 
     expect(find.text('Data belum bisa dimuat.'), findsOneWidget);
 
+    repository.failGet = false;
     await tester.tap(find.text('Coba lagi'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
@@ -162,13 +133,10 @@ void main() {
 
   testWidgets('skeleton tampil saat memuat', (tester) async {
     useDesignFrame(tester);
+    // Sebelum data async selesai → skeleton, bukan angka nol.
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: AppShell(appState: state, onRestartOnboarding: () {}),
-      ),
+      wrap(AppShell(appState: state, onRestartOnboarding: () {})),
     );
-    // Sebelum timer load selesai → skeleton, bukan angka nol.
     expect(find.text('AMAN DIBELANJAKAN'), findsNothing);
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
@@ -184,9 +152,9 @@ void main() {
         type: 'expense',
         amount: 250000,
         transactionDate: today,
-        categoryId: 'cat-makanan',
-        categoryName: 'Makanan',
-        description: 'Warung makan',
+        categoryId: 'cat-makan',
+        categoryName: 'Makan',
+        description: 'Kopi pagi',
       ),
     );
     await pumpHome(tester);
@@ -200,6 +168,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Transaksi'), findsWidgets);
     expect(find.textContaining('Terpakai siklus ini'), findsWidgets);
-    expect(find.text('Warung makan'), findsOneWidget);
+    expect(find.text('Kopi pagi'), findsOneWidget);
   });
 }

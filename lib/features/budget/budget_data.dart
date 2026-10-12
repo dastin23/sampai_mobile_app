@@ -2,7 +2,6 @@ import '../../core/calc/cycle_transactions.dart';
 import '../../core/calc/financial_summary.dart';
 import '../../core/calc/salary_cycle.dart';
 import '../../core/models/plan.dart';
-import '../../core/state/app_state.dart';
 
 /// ViewModel layar Budget (PRD 7.2) — seluruh nilai berasal dari
 /// [FinancialSummary] dan perhitungan siklus; UI tidak menghitung sendiri.
@@ -14,22 +13,6 @@ class BudgetOverview {
     required this.usages,
     required this.cycleTransactions,
   });
-
-  factory BudgetOverview.fromState({
-    required AppState state,
-    required DateTime today,
-  }) {
-    final plan = state.plan;
-    if (plan == null) {
-      throw StateError('BudgetOverview.fromState butuh plan');
-    }
-    return BudgetOverview.fromInputs(
-      plan: plan,
-      transactions: state.transactions,
-      budgets: state.budgets,
-      today: today,
-    );
-  }
 
   factory BudgetOverview.fromInputs({
     required Plan plan,

@@ -1,21 +1,18 @@
 import 'package:flutter/foundation.dart';
 
-import '../calc/salary_cycle.dart';
 import '../models/plan.dart';
 
-/// Penyimpanan data aplikasi (in-memory, MVP).
+/// Penyimpanan data aplikasi: hanya rencana finansial (siklus gaji, tagihan,
+/// tabungan) yang dipegang in-memory.
 ///
-/// Menjadi satu sumber kebenaran untuk Home, dan kelak Add Expense/Budget.
+/// Anggaran dan transaksi **tidak** disimpan di sini — keduanya bersumber
+/// dari Supabase lewat repository masing-masing (`transaction_providers`,
+/// `budget_providers`).
 class AppState extends ChangeNotifier {
   Plan? _plan;
-  final List<ExpenseTransaction> _transactions = <ExpenseTransaction>[];
-  final List<BudgetCategory> _budgets = <BudgetCategory>[];
-
   DateTime? _lastUpdatedAt;
 
   Plan? get plan => _plan;
-  List<ExpenseTransaction> get transactions => List.unmodifiable(_transactions);
-  List<BudgetCategory> get budgets => List.unmodifiable(_budgets);
 
   /// Waktu pembaruan data terakhir; null bila belum pernah ada data.
   DateTime? get lastUpdatedAt => _lastUpdatedAt;
@@ -29,50 +26,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Simpan transaksi. Mengabaikan duplikat id (idempotensi, PRD 6.5).
-  void addTransaction(ExpenseTransaction transaction) {
-    if (_transactions.any((t) => t.id == transaction.id)) return;
-    _transactions.insert(0, transaction);
-    _touch();
-    notifyListeners();
-  }
-
-  /// Perbarui transaksi berdasarkan id. Tidak terjadi apa-apa bila id tidak
-  /// ditemukan (mis. sudah dihapus).
-  void updateTransaction(ExpenseTransaction transaction) {
-    final index = _transactions.indexWhere((t) => t.id == transaction.id);
-    if (index < 0) return;
-    _transactions[index] = transaction;
-    _touch();
-    notifyListeners();
-  }
-
-  /// Hapus satu transaksi. Tidak terjadi apa-apa bila id tidak ditemukan.
-  void deleteTransaction(String id) {
-    final before = _transactions.length;
-    _transactions.removeWhere((t) => t.id == id);
-    if (_transactions.length == before) return;
-    _touch();
-    notifyListeners();
-  }
-
-  void replaceBudgets(List<BudgetCategory> budgets) {
-    _budgets
-      ..clear()
-      ..addAll(budgets);
-    _touch();
-    notifyListeners();
-  }
-
-  /// Ganti seluruh transaksi (dipakai saat hydrate dari backend).
-  void replaceTransactions(List<ExpenseTransaction> transactions) {
-    _transactions
-      ..clear()
-      ..addAll(transactions);
-    _touch();
-    notifyListeners();
-  }
-
   /// Tandai data diperbarui (mis. setelah sinkronisasi terkonfirmasi).
   void touch() {
     _touch();
@@ -82,24 +35,9 @@ class AppState extends ChangeNotifier {
   /// Hapus seluruh data lokal (dipakai saat mulai ulang pengaturan).
   void clear() {
     _plan = null;
-    _transactions.clear();
-    _budgets.clear();
     _lastUpdatedAt = null;
     notifyListeners();
   }
 
   void _touch() => _lastUpdatedAt = DateTime.now();
-
-  /// Transaksi yang dihitung terhadap anggaran fleksibel pada siklus [cycle]
-  /// (PRD 8.5 — transfer/di luar fleksibel tidak boleh ikut terpakai).
-  int discretionarySpentIn(SalaryCycle cycle) {
-    var total = 0;
-    for (final t in _transactions) {
-      if (!t.countsTowardFlexibleBudget) continue;
-      final date = DateTime(t.date.year, t.date.month, t.date.day);
-      if (date.isBefore(cycle.start) || date.isAfter(cycle.end)) continue;
-      total += t.amount;
-    }
-    return total;
-  }
 }

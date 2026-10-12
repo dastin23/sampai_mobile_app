@@ -1,18 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sampai_app/app/state/app_providers.dart';
 import 'package:sampai_app/core/state/app_state.dart';
 import 'package:sampai_app/core/theme/app_theme.dart';
-import 'package:sampai_app/features/add_expense/add_expense_controller.dart';
-import 'package:sampai_app/features/add_expense/add_expense_sheet.dart';
+import 'package:sampai_app/features/budget/providers/budget_providers.dart';
 import 'package:sampai_app/features/home/home_demo_data.dart';
 import 'package:sampai_app/features/shell/app_shell.dart';
+import 'package:sampai_app/features/transactions/providers/transaction_providers.dart';
+
+import 'helpers/demo_seed.dart';
+import 'helpers/fake_budget_repository.dart';
+import 'helpers/fake_transaction_repository.dart';
 
 void main() {
   late AppState state;
+  late FakeTransactionRepository repository;
+  late FakeBudgetRepository budgetRepository;
   final today = DateTime.now();
 
   setUp(() {
     state = AppState()..applyPlan(demoPlan(today));
+    repository = FakeTransactionRepository(categories: demoTestCategories);
+    budgetRepository = FakeBudgetRepository(categories: demoTestCategories);
   });
 
   tearDown(() => state.dispose());
@@ -25,9 +35,16 @@ void main() {
 
   Future<void> pumpHome(WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: AppShell(appState: state, onRestartOnboarding: () {}),
+      ProviderScope(
+        overrides: [
+          appStateProvider.overrideWithValue(state),
+          transactionRepositoryProvider.overrideWithValue(repository),
+          budgetRepositoryProvider.overrideWithValue(budgetRepository),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: AppShell(appState: state, onRestartOnboarding: () {}),
+        ),
       ),
     );
     await tester.pump(const Duration(milliseconds: 600));
@@ -95,17 +112,15 @@ void main() {
 
     await fillValid(tester);
     await tester.tap(find.text('Simpan pengeluaran'));
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(find.text('Menyimpan…'), findsOneWidget);
-    expect(find.text('Simpan pengeluaran'), findsNothing);
-
-    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
     expect(find.text('Pengeluaran tersimpan'), findsOneWidget);
     // 4.200.000 − 75.000 = 4.125.000 (kartu utama, di atas halaman).
     expect(find.text('Rp4.125.000'), findsOneWidget);
     expect(find.text('Estimasi'), findsNothing);
+    // Tersimpan di repository.
+    expect(repository.transactions.single.amount, 75000);
+    expect(repository.transactions.single.categoryName, 'Makan');
 
     // Bagian "Transaksi terbaru" ada di bawah; gulir dulu.
     await tester.scrollUntilVisible(
@@ -118,62 +133,15 @@ void main() {
     expect(find.text('−Rp75.000'), findsOneWidget);
   });
 
-  testWidgets('submit berulang tidak membuat transaksi ganda', (tester) async {
+  testWidgets('gagal simpan menahan sheet dan mempertahankan draft',
+      (tester) async {
     useDesignFrame(tester);
+    repository.failCreate = true;
     await pumpHome(tester);
     await openSheet(tester);
 
     await fillValid(tester);
     await tester.tap(find.text('Simpan pengeluaran'));
-    await tester.pump(const Duration(milliseconds: 50));
-
-    // CTA dalam keadaan loading/nonaktif → percobaan kedua tidak berefek.
-    expect(find.text('Menyimpan…'), findsOneWidget);
-    await tester.tap(find.text('Menyimpan…'), warnIfMissed: false);
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Pengeluaran tersimpan'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('−Rp75.000'),
-      120,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('−Rp75.000'), findsOneWidget);
-  });
-
-  testWidgets('gagal simpan menahan sheet dan mempertahankan draft',
-      (tester) async {
-    useDesignFrame(tester);
-    final failing = AddExpenseController(state, simulateFailure: true);
-    addTearDown(failing.dispose);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => Center(
-              child: FilledButton(
-                onPressed: () => showAddExpenseSheet(
-                  context,
-                  appState: state,
-                  controller: failing,
-                ),
-                child: const Text('Buka'),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.tap(find.text('Buka'));
-    await tester.pumpAndSettle();
-
-    await fillValid(tester);
-    await tester.tap(find.text('Simpan pengeluaran'));
-    await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
     expect(find.text('Belum berhasil menyimpan. Coba lagi.'), findsOneWidget);

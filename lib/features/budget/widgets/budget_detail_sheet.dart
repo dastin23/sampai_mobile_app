@@ -6,7 +6,6 @@ import '../../../core/format/rupiah.dart';
 import '../../../core/models/plan.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/category_icons.dart';
-import '../budget_controller.dart';
 import '../budget_data.dart';
 import 'budget_edit_sheet.dart';
 
@@ -14,9 +13,10 @@ import 'budget_edit_sheet.dart';
 /// daftar transaksi, dan aksi "Ubah anggaran".
 Future<void> showBudgetDetailSheet(
   BuildContext context, {
-  required BudgetController controller,
   required BudgetOverview overview,
   required BudgetUsage usage,
+  required Map<String, int> currentLimits,
+  required Future<void> Function(Map<String, int> limits) onSave,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -111,9 +111,10 @@ Future<void> showBudgetDetailSheet(
                   Navigator.pop(context);
                   showBudgetEditSheet(
                     context,
-                    controller: controller,
                     title: 'Ubah anggaran',
                     initialLimits: {usage.category: usage.limit},
+                    currentLimits: currentLimits,
+                    onSave: onSave,
                     flexibleBudget: overview.flexibleBudget,
                   );
                 },

@@ -1,37 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/state/app_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/liquid_glass.dart';
-import 'home_controller.dart';
+import '../budget/budget_adapters.dart';
+import '../budget/providers/budget_providers.dart';
+import '../transactions/models/transaction_adapters.dart';
+import '../transactions/providers/transaction_providers.dart';
 import 'home_data.dart';
 import 'home_sections.dart';
 import 'widgets/money_velocity_card.dart';
 import 'widgets/safe_to_spend_card.dart';
 
-class HomeScreen extends StatefulWidget {
+enum _HomeStatus { loading, ready, error }
+
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({
     super.key,
-    required this.controller,
     required this.onAddExpense,
     required this.onAddIncome,
     required this.onSeeAllBudgets,
     required this.onSeeAllTransactions,
+    required this.onOpenProfile,
     required this.onRestartOnboarding,
   });
 
-  final HomeController controller;
   final VoidCallback onAddExpense;
   final VoidCallback onAddIncome;
   final VoidCallback onSeeAllBudgets;
   final VoidCallback onSeeAllTransactions;
+  final VoidCallback onOpenProfile;
   final VoidCallback onRestartOnboarding;
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  DateTime _today = DateTime.now();
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  late DateTime _today;
 
   @override
   void initState() {
@@ -41,155 +48,96 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static DateTime _normalize(DateTime d) => DateTime(d.year, d.month, d.day);
 
-  Future<void> _showPreviewSheet() async {
-    final controller = widget.controller;
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.glassSheet,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 20, 24, 4),
-              child: Text('Pratinjau state (mode desain)', style: AppTypography.h3),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'Hanya untuk pengujian; data contoh dihitung dengan formula produksi.',
-                style: AppTypography.caption,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.refresh),
-              title: const Text('Memuat (skeleton)'),
-              onTap: () {
-                Navigator.pop(context);
-                controller.previewLoading();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.home_outlined),
-              title: const Text('Normal (data pengguna)'),
-              onTap: () {
-                Navigator.pop(context);
-                controller.previewNormal();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.speed),
-              title: const Text('Peringatan (velocity > 1)'),
-              onTap: () {
-                Navigator.pop(context);
-                controller.previewWarning();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.error_outline),
-              title: const Text('Kritis (Safe-to-Spend 0)'),
-              onTap: () {
-                Navigator.pop(context);
-                controller.previewCritical();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.cloud_off_outlined),
-              title: const Text('Offline'),
-              onTap: () {
-                Navigator.pop(context);
-                controller.previewOffline();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.rocket_launch_outlined),
-              title: const Text('First-use / kosong'),
-              onTap: () {
-                Navigator.pop(context);
-                controller.previewFirstUse();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.cloud_off_outlined),
-              title: const Text('Error'),
-              onTap: () {
-                Navigator.pop(context);
-                controller.previewError();
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-          ),
-        ),
-      ),
+  void _retry() {
+    ref.invalidate(transactionsProvider);
+    final month = activeBudgetMonth(
+      ref.read(appStateProvider).plan,
+      _today,
     );
+    ref.invalidate(budgetsProvider(month));
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = widget.controller;
-    return ListenableBuilder(
-      listenable: controller,
-      builder: (context, _) {
-        final status = controller.status;
-        return Column(
-          children: [
-            _Header(
-              cycleLabel: controller.data?.cycleLabel,
-              previewNote: controller.previewNote,
-              onPreview: _showPreviewSheet,
-            ),
-            Expanded(
-              child: switch (status) {
-                HomeStatus.loading => const HomeSkeleton(),
-                HomeStatus.error => HomeErrorView(onRetry: controller.load),
-                HomeStatus.ready => controller.firstUse
-                    ? _FirstUseView(onStart: widget.onRestartOnboarding)
-                    : _ReadyView(
-                        data: controller.data!,
-                        today: _today,
-                        onAddExpense: widget.onAddExpense,
-                        onSeeAllBudgets: widget.onSeeAllBudgets,
-                        onSeeAllTransactions: widget.onSeeAllTransactions,
-                      ),
-              },
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppSpacing.pageHorizontal,
-                AppSpacing.component,
-                AppSpacing.pageHorizontal,
-                AppSpacing.componentWide,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: widget.onAddIncome,
-                      icon: const Icon(Icons.arrow_downward, size: 20),
-                      label: const Text('Catat pemasukan'),
-                    ),
+    final plan = ref.watch(appStateProvider).plan;
+    final today = _today;
+    final month = activeBudgetMonth(plan, today);
+
+    final transactionsAsync = ref.watch(transactionsProvider);
+    final budgetsAsync = ref.watch(budgetsProvider(month));
+
+    _HomeStatus status = _HomeStatus.ready;
+    HomeData? data;
+    var firstUse = false;
+
+    if (plan == null) {
+      firstUse = true;
+    } else if (transactionsAsync.hasError || budgetsAsync.hasError) {
+      status = _HomeStatus.error;
+    } else if (transactionsAsync.isLoading || budgetsAsync.isLoading) {
+      status = _HomeStatus.loading;
+    } else {
+      data = HomeData.fromInputs(
+        plan: plan,
+        transactions: (transactionsAsync.value ?? const [])
+            .map(toExpenseTransaction)
+            .toList(),
+        budgets: toBudgetCategories(budgetsAsync.value ?? const []),
+        today: today,
+        offline: false,
+        updatedAt: null,
+      );
+    }
+
+    return Column(
+      children: [
+        _Header(
+          cycleLabel: data?.cycleLabel,
+          onOpenProfile: widget.onOpenProfile,
+        ),
+        Expanded(
+          child: switch (status) {
+            _HomeStatus.loading => const HomeSkeleton(),
+            _HomeStatus.error => HomeErrorView(onRetry: _retry),
+            _HomeStatus.ready => firstUse
+                ? _FirstUseView(onStart: widget.onRestartOnboarding)
+                : _ReadyView(
+                    data: data!,
+                    today: today,
+                    onAddExpense: widget.onAddExpense,
+                    onSeeAllBudgets: widget.onSeeAllBudgets,
+                    onSeeAllTransactions: widget.onSeeAllTransactions,
                   ),
-                  const SizedBox(width: AppSpacing.component),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: widget.onAddExpense,
-                      icon: const Icon(Icons.add, size: 22),
-                      label: const Text('Catat pengeluaran'),
-                    ),
-                  ),
-                ],
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.pageHorizontal,
+            AppSpacing.component,
+            AppSpacing.pageHorizontal,
+            AppSpacing.componentWide,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: widget.onAddIncome,
+                  icon: const Icon(Icons.arrow_downward, size: 20),
+                  label: const Text('Catat pemasukan'),
+                ),
               ),
-            ),
-          ],
-        );
-      },
+              const SizedBox(width: AppSpacing.component),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: widget.onAddExpense,
+                  icon: const Icon(Icons.add, size: 22),
+                  label: const Text('Catat pengeluaran'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -197,13 +145,11 @@ class _HomeScreenState extends State<HomeScreen> {
 class _Header extends StatelessWidget {
   const _Header({
     required this.cycleLabel,
-    required this.previewNote,
-    required this.onPreview,
+    required this.onOpenProfile,
   });
 
   final String? cycleLabel;
-  final String? previewNote;
-  final VoidCallback onPreview;
+  final VoidCallback onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -222,22 +168,11 @@ class _Header extends StatelessWidget {
               children: [
                 const Text('Halo!', style: AppTypography.h2),
                 Text(
-                  cycleLabel == null ? 'Siklus belum diatur' : 'Siklus $cycleLabel',
+                  cycleLabel == null
+                      ? 'Siklus belum diatur'
+                      : 'Siklus $cycleLabel',
                   style: AppTypography.caption,
                 ),
-                if (previewNote != null) ...[
-                  const SizedBox(height: 4),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Text(previewNote!, style: AppTypography.caption),
-                  ),
-                ],
               ],
             ),
           ),
@@ -245,8 +180,8 @@ class _Header extends StatelessWidget {
             width: AppSpacing.minTouchTarget,
             height: AppSpacing.minTouchTarget,
             child: IconButton(
-              onPressed: onPreview,
-              tooltip: 'Pratinjau state',
+              onPressed: onOpenProfile,
+              tooltip: 'Buka profil',
               padding: EdgeInsets.zero,
               icon: GlassSurface(
                 kind: GlassKind.raised,

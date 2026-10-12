@@ -1,122 +1,95 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/state/app_providers.dart';
 import '../../core/calc/financial_summary.dart';
 import '../../core/format/rupiah.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/theme/category_icons.dart';
 import '../../core/theme/liquid_glass.dart';
 import '../home/home_sections.dart';
 import '../home/widgets/progress_bar.dart';
-import 'budget_controller.dart';
+import '../transactions/models/transaction_adapters.dart';
+import '../transactions/models/transaction_model.dart';
+import '../transactions/providers/transaction_providers.dart';
+import 'budget_adapters.dart';
 import 'budget_data.dart';
+import 'providers/budget_providers.dart';
 import 'widgets/budget_detail_sheet.dart';
 import 'widgets/budget_edit_sheet.dart';
 import 'widgets/budget_usage_row.dart';
 
-class BudgetScreen extends StatefulWidget {
-  const BudgetScreen({super.key, required this.controller});
+enum _BudgetStatus { loading, ready, error }
 
-  final BudgetController controller;
+class BudgetScreen extends ConsumerStatefulWidget {
+  const BudgetScreen({super.key, required this.onOpenProfile});
+
+  final VoidCallback onOpenProfile;
 
   @override
-  State<BudgetScreen> createState() => _BudgetScreenState();
+  ConsumerState<BudgetScreen> createState() => _BudgetScreenState();
 }
 
-class _BudgetScreenState extends State<BudgetScreen> {
-  Future<void> _showPreviewSheet() async {
-    final controller = widget.controller;
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.glassSheet,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(24, 20, 24, 4),
-                child: Text('Pratinjau state (mode desain)',
-                    style: AppTypography.h3),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  'Hanya untuk pengujian; data contoh dihitung dengan formula produksi.',
-                  style: AppTypography.caption,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: const Icon(Icons.refresh),
-                title: const Text('Memuat (skeleton)'),
-                onTap: () {
-                  Navigator.pop(context);
-                  controller.previewLoading();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.donut_small_outlined),
-                title: const Text('Normal (data pengguna)'),
-                onTap: () {
-                  Navigator.pop(context);
-                  controller.previewNormal();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.inbox_outlined),
-                title: const Text('Kosong (belum ada anggaran)'),
-                onTap: () {
-                  Navigator.pop(context);
-                  controller.previewEmpty();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.speed),
-                title: const Text('Mendekati batas (80%)'),
-                onTap: () {
-                  Navigator.pop(context);
-                  controller.previewNearLimit();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.error_outline),
-                title: const Text('Melebihi anggaran'),
-                onTap: () {
-                  Navigator.pop(context);
-                  controller.previewOverBudget();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.cloud_off_outlined),
-                title: const Text('Error'),
-                onTap: () {
-                  Navigator.pop(context);
-                  controller.previewError();
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
-    );
+class _BudgetScreenState extends ConsumerState<BudgetScreen> {
+  late final DateTime _today;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _today = DateTime(now.year, now.month, now.day);
   }
 
-  void _openEditAll() {
-    final controller = widget.controller;
-    final limits = controller.currentLimits;
+  Map<String, int> _limitsOf(BudgetOverview? overview) => {
+        if (overview != null)
+          for (final usage in overview.usages) usage.category: usage.limit,
+      };
+
+  void _retry() {
+    final plan = ref.read(appStateProvider).plan;
+    ref.invalidate(budgetsProvider(activeBudgetMonth(plan, _today)));
+    ref.invalidate(transactionsProvider);
+  }
+
+  Future<void> _saveLimits(Map<String, int> limits, BudgetOverview? overview) async {
+    final plan = ref.read(appStateProvider).plan;
+    final month = activeBudgetMonth(plan, _today);
+    final categories =
+        ref.read(transactionCategoriesProvider).value ?? const [];
+    final byName = {
+      for (final category in categories)
+        if (category.type == 'expense') category.name: category.id,
+    };
+    final repository = ref.read(budgetRepositoryProvider);
+    final merged = <String, int>{..._limitsOf(overview)}..addAll(limits);
+
+    for (final entry in merged.entries) {
+      final categoryId = byName[entry.key];
+      if (categoryId == null) continue;
+      await repository.setBudget(
+        categoryId: categoryId,
+        month: month,
+        amount: entry.value.toDouble(),
+      );
+    }
+    if (mounted) ref.invalidate(budgetsProvider(month));
+  }
+
+  void _openEditAll(BudgetOverview? overview, List<TransactionCategory> categories) {
+    final current = _limitsOf(overview);
+    final initial = <String, int>{
+      for (final category in categories)
+        if (category.type == 'expense') category.name: current[category.name] ?? 0,
+    };
+    for (final entry in current.entries) {
+      initial.putIfAbsent(entry.key, () => entry.value);
+    }
     showBudgetEditSheet(
       context,
-      controller: controller,
-      title: limits.isEmpty ? 'Atur anggaran' : 'Ubah anggaran',
-      initialLimits: limits.isEmpty
-          ? {for (final category in categoryIcons.keys) category: 0}
-          : limits,
-      flexibleBudget: controller.overview?.flexibleBudget,
+      title: current.isEmpty ? 'Atur anggaran' : 'Ubah anggaran',
+      initialLimits: initial,
+      currentLimits: current,
+      onSave: (limits) => _saveLimits(limits, overview),
+      flexibleBudget: overview?.flexibleBudget,
     );
   }
 
@@ -125,46 +98,69 @@ class _BudgetScreenState extends State<BudgetScreen> {
     if (usage == null) return;
     showBudgetDetailSheet(
       context,
-      controller: widget.controller,
       overview: overview,
       usage: usage,
+      currentLimits: _limitsOf(overview),
+      onSave: (limits) => _saveLimits(limits, overview),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = widget.controller;
-    return ListenableBuilder(
-      listenable: controller,
-      builder: (context, _) {
-        return Column(
-          children: [
-            _Header(
-              cycleLabel: controller.overview?.cycleLabel,
-              previewNote: controller.previewNote,
-              onPreview: _showPreviewSheet,
-            ),
-            Expanded(
-              child: switch (controller.status) {
-                BudgetStatus.loading => const BudgetSkeleton(),
-                BudgetStatus.error =>
-                  HomeErrorView(onRetry: controller.load),
-                BudgetStatus.ready => controller.isEmpty
-                    ? _EmptyView(
-                        flexibleBudget:
-                            controller.overview?.flexibleBudget,
-                        onSetUp: _openEditAll,
-                      )
-                    : _OverviewView(
-                        overview: controller.overview!,
-                        onEditAll: _openEditAll,
-                        onOpenCategory: _openDetail,
-                      ),
-              },
-            ),
-          ],
-        );
-      },
+    final plan = ref.watch(appStateProvider).plan;
+    final today = _today;
+    final month = activeBudgetMonth(plan, today);
+
+    final transactionsAsync = ref.watch(transactionsProvider);
+    final budgetsAsync = ref.watch(budgetsProvider(month));
+    final categories =
+        ref.watch(transactionCategoriesProvider).value ?? const [];
+
+    _BudgetStatus status = _BudgetStatus.ready;
+    BudgetOverview? overview;
+    var empty = false;
+
+    if (plan == null) {
+      empty = true;
+    } else if (transactionsAsync.hasError || budgetsAsync.hasError) {
+      status = _BudgetStatus.error;
+    } else if (transactionsAsync.isLoading || budgetsAsync.isLoading) {
+      status = _BudgetStatus.loading;
+    } else {
+      overview = BudgetOverview.fromInputs(
+        plan: plan,
+        transactions: (transactionsAsync.value ?? const [])
+            .map(toExpenseTransaction)
+            .toList(),
+        budgets: toBudgetCategories(budgetsAsync.value ?? const []),
+        today: today,
+      );
+      if (overview.isEmpty) empty = true;
+    }
+
+    return Column(
+      children: [
+        _Header(
+          cycleLabel: overview?.cycleLabel,
+          onOpenProfile: widget.onOpenProfile,
+        ),
+        Expanded(
+          child: switch (status) {
+            _BudgetStatus.loading => const BudgetSkeleton(),
+            _BudgetStatus.error => HomeErrorView(onRetry: _retry),
+            _BudgetStatus.ready => empty
+                ? _EmptyView(
+                    flexibleBudget: overview?.flexibleBudget,
+                    onSetUp: () => _openEditAll(overview, categories),
+                  )
+                : _OverviewView(
+                    overview: overview!,
+                    onEditAll: () => _openEditAll(overview, categories),
+                    onOpenCategory: _openDetail,
+                  ),
+          },
+        ),
+      ],
     );
   }
 }
@@ -172,13 +168,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
 class _Header extends StatelessWidget {
   const _Header({
     required this.cycleLabel,
-    required this.previewNote,
-    required this.onPreview,
+    required this.onOpenProfile,
   });
 
   final String? cycleLabel;
-  final String? previewNote;
-  final VoidCallback onPreview;
+  final VoidCallback onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -202,19 +196,6 @@ class _Header extends StatelessWidget {
                       : 'Siklus $cycleLabel',
                   style: AppTypography.caption,
                 ),
-                if (previewNote != null) ...[
-                  const SizedBox(height: 4),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Text(previewNote!, style: AppTypography.caption),
-                  ),
-                ],
               ],
             ),
           ),
@@ -222,12 +203,23 @@ class _Header extends StatelessWidget {
             width: AppSpacing.minTouchTarget,
             height: AppSpacing.minTouchTarget,
             child: IconButton(
-              onPressed: onPreview,
-              tooltip: 'Pratinjau state',
+              onPressed: onOpenProfile,
+              tooltip: 'Buka profil',
               padding: EdgeInsets.zero,
-              icon: const Icon(
-                Icons.visibility_outlined,
-                color: AppColors.primary,
+              icon: GlassSurface(
+                kind: GlassKind.raised,
+                radius: 999,
+                color: AppColors.brandSoft.withValues(alpha: 0.75),
+                borderColor: Colors.white.withValues(alpha: 0.8),
+                child: const SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(
+                    Icons.person_outline,
+                    size: 22,
+                    color: AppColors.primaryStrong,
+                  ),
+                ),
               ),
             ),
           ),

@@ -2,7 +2,6 @@ import '../../core/calc/cycle_transactions.dart';
 import '../../core/calc/financial_summary.dart';
 import '../../core/calc/salary_cycle.dart';
 import '../../core/models/plan.dart';
-import '../../core/state/app_state.dart';
 
 /// Cakupan daftar transaksi di layar: siklus berjalan atau seluruh riwayat.
 enum TransactionScope { cycle, all }
@@ -19,25 +18,6 @@ class TransactionsData {
     this.period,
     this.availablePeriods = const [],
   });
-
-  factory TransactionsData.fromState({
-    required AppState state,
-    required DateTime today,
-    TransactionScope scope = TransactionScope.cycle,
-    SalaryCycle? period,
-  }) {
-    final plan = state.plan;
-    if (plan == null) {
-      throw StateError('TransactionsData.fromState butuh plan');
-    }
-    return TransactionsData.fromInputs(
-      plan: plan,
-      transactions: state.transactions,
-      today: today,
-      scope: scope,
-      period: period,
-    );
-  }
 
   factory TransactionsData.fromInputs({
     required Plan plan,

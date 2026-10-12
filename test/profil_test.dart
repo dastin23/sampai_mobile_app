@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sampai_app/app/state/app_providers.dart';
 import 'package:sampai_app/core/state/app_state.dart';
 import 'package:sampai_app/core/theme/app_theme.dart';
 import 'package:sampai_app/features/auth/providers/auth_providers.dart';
+import 'package:sampai_app/features/budget/providers/budget_providers.dart';
 import 'package:sampai_app/features/home/home_demo_data.dart';
 import 'package:sampai_app/features/shell/app_shell.dart';
+import 'package:sampai_app/features/transactions/providers/transaction_providers.dart';
 
 import 'helpers/fake_auth_repository.dart';
+import 'helpers/fake_budget_repository.dart';
+import 'helpers/fake_transaction_repository.dart';
 
 void main() {
   late AppState state;
@@ -32,7 +37,14 @@ void main() {
     final repo = FakeAuthRepository(authenticated: true);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [authRepositoryProvider.overrideWithValue(repo)],
+        overrides: [
+          authRepositoryProvider.overrideWithValue(repo),
+          appStateProvider.overrideWithValue(state),
+          transactionRepositoryProvider.overrideWithValue(
+            FakeTransactionRepository(),
+          ),
+          budgetRepositoryProvider.overrideWithValue(FakeBudgetRepository()),
+        ],
         child: MaterialApp(
           theme: buildAppTheme(),
           home: AppShell(
